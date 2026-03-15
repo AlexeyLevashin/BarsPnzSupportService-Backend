@@ -4,6 +4,10 @@ using System.Text;
 using Application.Authentication;
 using Application.Dto.Authorization.Requests;
 using Application.Dto.Authorization.Responses;
+using Application.Exceptions.Auth;
+using Application.Exceptions.Institutions;
+using Application.Exceptions.Requests;
+using Application.Exceptions.Users;
 using Application.Interfaces;
 using Application.Interfaces.Authentication;
 using Domain.DbModels;
@@ -38,7 +42,7 @@ public class AuthService : IAuthService
 
         if (user is null || !_passwordService.Verify(request.Password, user.PasswordHash))
         {
-            throw new Exception("Неверный логин или пароль");
+            throw new FailureAuthorizationException();
         }
 
         var accessToken = _jwtProvider.GenerateAccessToken(user);
@@ -56,7 +60,7 @@ public class AuthService : IAuthService
 
         if (user is not null)
         {
-            throw new Exception("Пользователь с данным Email уже существует в системе");
+            throw new UserWithEmailIsAlreadyExistException();
         }
 
         if (request.InstitutionId != null)
@@ -64,7 +68,7 @@ public class AuthService : IAuthService
             var institution = await _institutionRepository.GetByIdAsync((Guid)request.InstitutionId);
             if (institution is null)
             {
-                throw new Exception("Данного учреждения не существует в системе");
+                throw new InstitutionNotFoundException();
             }
         }
 
@@ -88,19 +92,19 @@ public class AuthService : IAuthService
         var principal = _jwtProvider.ValidateToken(request.RefreshToken);
         if (principal is null)
         {
-            throw new Exception("Невалидный или просроченный Refresh-токен");
+            throw new InvalidTokenException();
         }
 
         var userIdString = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out Guid userId))
         {
-            throw new Exception("Ошибка чтения токена: неверный формат ID пользователя.");
+            throw new InvalidUserIdInTokenException();
         }
 
         var user = await _userRepository.GetByIdAsync(userId);
         if (user is null)
         {
-            throw new Exception("Пользователь не найден в системе");
+            throw new UserNotFoundException();
         }
 
         var newAccessToken = _jwtProvider.GenerateAccessToken(user);
