@@ -2,6 +2,9 @@
 using Application.Dto.Institutions.Requests;
 using Application.Dto.Users.Requests;
 using Application.Dto.Users.Responses;
+using Application.Exceptions.Abstractions;
+using Application.Exceptions.Institutions;
+using Application.Exceptions.Users;
 using Application.Interfaces;
 using Domain.DbModels;
 using Domain.Enums;
@@ -29,14 +32,14 @@ public class UserService : IUserService
     {
         if (Guid.Empty == userId)
         {
-            throw new Exception("ID пользователя не может быть пустым");
+            throw new BadRequestException("ID пользователя не может быть пустым");
         }
         
         var user = await _userRepository.GetByIdAsync(userId);
 
         if (user is null)
         {
-            throw new Exception("Пользователь с указанным ID не найден");
+            throw new UserNotFoundException();
         }
         
         return user.Adapt<GetUserResponse>();
@@ -52,19 +55,19 @@ public class UserService : IUserService
         
         if (userRole == UserRole.Operator && request.Role == UserRole.SuperAdmin)
         {
-            throw new Exception("Оператор не может добавлять суперадмина");
+            throw new ForbiddenException("Оператор не может добавлять суперадмина");
         }
 
         if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && request.InstitutionId is null)
         {
-            throw new Exception("Пользователь должен быть привязан к учреждению");
+            throw new UserNotBoundToInstitutionException();
         }
         
         var user = await _userRepository.GetByEmailAsync(request.Email);
         
         if (user is not null)
         {
-            throw new Exception("Пользователь с данным Email уже существует");
+            throw new UserWithEmailIsAlreadyExistException();
         }
 
         if (request.InstitutionId != null)
@@ -73,7 +76,7 @@ public class UserService : IUserService
 
             if (institution is null)
             {
-                throw new Exception("Учреждение не существует");
+                throw new InstitutionNotFoundException();
             }
         }
     
@@ -102,7 +105,7 @@ public class UserService : IUserService
         {
             if (institutionId is null)
             {
-                throw new Exception("Произошла ошибка, пользователь запрашивающий данные, должен быть привязан к учрежению");
+                throw new UserNotBoundToInstitutionException();
             }
             filterInstitutionId = institutionId;
         }
@@ -121,17 +124,17 @@ public class UserService : IUserService
         var userToUpdate = await _userRepository.GetByIdAsync(id);
         if (userToUpdate is null)
         {
-            throw new Exception("Пользователя с данным ID не существует в системе");
+            throw new UserNotFoundException();
         }
         
         if (userId != id && userRole == UserRole.User)
         {
-            throw new Exception("Пользователь не может изменять других пользователей");
+            throw new ForbiddenException("Пользователь не может изменять других пользователей");
         }
         
         if (userId != id && userRole == UserRole.UserAdmin && (userToUpdate.Role != UserRole.User || userToUpdate.InstitutionId != institutionId))
         {
-            throw new Exception("Администратор учреждения может изменять только обычных пользователей и только в пределах своего учреждения");
+            throw new ForbiddenException("Администратор учреждения может изменять только обычных пользователей и только в пределах своего учреждения");
         }
 
         if (userRole == UserRole.UserAdmin || userRole == UserRole.User)
@@ -142,23 +145,23 @@ public class UserService : IUserService
 
         if (userRole == UserRole.Operator && (request.Role == UserRole.SuperAdmin || request.Role == UserRole.Operator))
         {
-            throw new Exception("Оператор не может выдавать такие права");
+            throw new ForbiddenException("Оператор не может выдавать такие права");
         }
 
         if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && request.InstitutionId is null)
         {
-            throw new Exception("Пользователь должен быть привязан к учреждению");
+            throw new UserNotBoundToInstitutionException();
         }
         
         if (userId != id && userRole == UserRole.Operator && (userToUpdate.Role == UserRole.SuperAdmin || userToUpdate.Role == UserRole.Operator))
         {
-            throw new Exception("У вас нет прав на изменение данного пользователя");
+            throw new ForbiddenException("У вас нет прав на изменение данного пользователя");
         }
 
         var checkEmailExist = await _userRepository.GetByEmailAsync(request.Email);
         if (checkEmailExist is not null && checkEmailExist.Id != id)
         {
-            throw new Exception("Пользователь с данным Email уже существует");
+            throw new UserWithEmailIsAlreadyExistException();
         }
         
         if  (request.InstitutionId != null)
@@ -167,7 +170,7 @@ public class UserService : IUserService
 
             if (institution is null)
             {
-                throw new Exception("Учреждение не существует");
+                throw new InstitutionNotFoundException();
             }
         }
 
@@ -184,12 +187,12 @@ public class UserService : IUserService
         var user = await _userRepository.GetByIdAsync(id);
         if (user is null)
         {
-            throw new Exception("Пользователя с данным ID не существует в системе");
+            throw new UserNotFoundException();
         }
 
         if (!_passwordService.Verify(request.Password, user.PasswordHash))
         {
-            throw new Exception("Задан неверный пароль");
+            throw new FailureAuthorizationException();
         }
 
         user.PasswordHash = _passwordService.Hash(request.NewPassword);
@@ -202,22 +205,22 @@ public class UserService : IUserService
         // todo Когда будет реализована работа с почтой, раскомментить проверку
         // if (userId == id)
         // {
-        //     throw new Exception("Нельзя поменять пароль без подтверждения почты самому себе");
+        //     throw new BadRequestException("Нельзя поменять пароль без подтверждения почты самому себе");
         // }
         var userToUpdate = await _userRepository.GetByIdAsync(id);
         if (userToUpdate is null)
         {
-            throw new Exception("Пользователя с данным ID не существует в системе");
+            throw new UserNotFoundException();
         }
 
         if (userId != id && userRole == UserRole.UserAdmin && (userToUpdate.Role != UserRole.User || userToUpdate.InstitutionId != institutionId))
         {
-            throw new Exception("У вас нет прав на изменение пароля для данного пользователя");
+            throw new ForbiddenException("У вас нет прав на изменение пароля для данного пользователя");
         }
         
         if (userId != id && userRole == UserRole.Operator && (userToUpdate.Role == UserRole.SuperAdmin || userToUpdate.Role == UserRole.Operator))
         {
-            throw new Exception("У вас нет прав на изменение пароля для данного пользователя");
+            throw new ForbiddenException("У вас нет прав на изменение пароля для данного пользователя");
         }
         
         var newPassword = _passwordService.GeneratePassword();
@@ -234,29 +237,29 @@ public class UserService : IUserService
     {
         if (userId == id)
         {
-            throw new Exception("Нельзя удалить самого себя");
+            throw new BadRequestException("Нельзя удалить самого себя");
         }
         
         var userToDelete = await _userRepository.GetByIdAsync(id);
         
         if (userToDelete is null)
         {
-            throw new Exception("Пользователя с данным ID не существует в системе");
+            throw new UserNotFoundException();
         }
         
         if (userRole == UserRole.UserAdmin && userToDelete.Role != UserRole.User)
         {
-            throw new Exception("У вас нет прав на удаление этого пользователя");
+            throw new ForbiddenException("У вас нет прав на удаление этого пользователя");
         }
 
         if (userRole == UserRole.UserAdmin && institutionId != userToDelete.InstitutionId)
         {
-            throw new Exception("Нельзя удалить пользователя не из своего учреждения");
+            throw new ForbiddenException("Нельзя удалить пользователя не из своего учреждения");
         }
 
         if (userRole == UserRole.Operator && (userToDelete.Role == UserRole.SuperAdmin || userToDelete.Role == UserRole.Operator))
         {
-            throw new Exception("У вас нет прав на удаление данного пользователя");
+            throw new ForbiddenException("У вас нет прав на удаление данного пользователя");
         }
 
         _userRepository.DeleteAsync(userToDelete);

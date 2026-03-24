@@ -1,6 +1,8 @@
 ﻿using Application.Common.Pagination;
 using Application.Dto.Institutions.Requests;
 using Application.Dto.Institutions.Responses;
+using Application.Exceptions.Institutions;
+using Application.Exceptions.Users;
 using Application.Interfaces;
 using Domain.DbModels;
 using Domain.Enums;
@@ -27,14 +29,14 @@ public class InstitutionService : IInstitutionService
     {
         if (institutionsId is null)
         {
-            throw new Exception("Вы не привязаны ни к одному учреждению");
+            throw new UserNotBoundToInstitutionException();
         }
         
         var institution = await _institutionRepository.GetByIdAsync(institutionsId.Value);
 
         if (institution is null)
         {
-            throw new Exception("Учреждение с данным ID не найдено");
+            throw new InstitutionNotFoundException();
         }
         
         return institution.Adapt<GetInstitutionResponse>();
@@ -45,7 +47,7 @@ public class InstitutionService : IInstitutionService
         var institution = await _institutionRepository.GetByInnAsync(request.INN);
         if (institution is not null)
         {
-            throw new Exception("Учреждение с данным ИНН уже существует в системе");
+            throw new InstitutionWithInnIsAlreadyExistException();
         }
 
         var newInstitution = request.Adapt<DbInstitution>();
@@ -78,7 +80,7 @@ public class InstitutionService : IInstitutionService
         var institution = await _institutionRepository.GetByIdAsync(id);
         if (institution is null)
         {
-            throw new Exception("Учреждение не найдено");
+            throw new InstitutionNotFoundException();
         }
         
         if (!string.Equals(updateInstitution.INN, institution.INN, StringComparison.Ordinal))
@@ -86,7 +88,7 @@ public class InstitutionService : IInstitutionService
             var existingInstitutionByInn = await _institutionRepository.GetByInnAsync(updateInstitution.INN);
             if (existingInstitutionByInn is not null)
             {
-                throw new Exception("Учреждение с данным номером ИНН уже существует, ИНН должен быть уникальным");
+                throw new InstitutionWithInnIsAlreadyExistException();
             }
         }
         
@@ -102,13 +104,13 @@ public class InstitutionService : IInstitutionService
         var institution = await _institutionRepository.GetByIdAsync(id);
         if (institution is null)
         {
-            throw new Exception("Выбранное учреждение не найдено");
+            throw new InstitutionNotFoundException();
         }
 
         var hasUsers = await _userRepository.CheckUserExistByInstitutionId(id);
         if (hasUsers)
         {
-            throw new Exception("Нельзя удалить учреждение, в котором числятся сотрудники. Сначала переведите или удалите персонал.");
+            throw new InstitutionHasEmployeesException();
         }
 
         _institutionRepository.DeleteAsync(institution);
