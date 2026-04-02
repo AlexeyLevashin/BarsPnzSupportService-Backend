@@ -40,17 +40,6 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// builder.Services.AddCors(options =>
-// {
-//     options.AddPolicy("AllowLocalFront", policy =>
-//     {
-//         policy.WithOrigins("http://localhost:3000", "http://localhost:5173") 
-//             .AllowAnyHeader()
-//             .AllowAnyMethod()
-//             .AllowCredentials();
-//     });
-// });
-
 var app = builder.Build();
 
 await app.UseDbInitializer();
