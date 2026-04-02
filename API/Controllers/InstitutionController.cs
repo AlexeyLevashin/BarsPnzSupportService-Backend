@@ -29,6 +29,14 @@ public class InstitutionController : BaseController
         return Ok(await _institutionService.AddAsync(request));
     }
 
+    [HttpGet("{id}")]
+    [Authorize(Roles = "SuperAdmin, Operator")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        return Ok(await _institutionService.GetByIdAsync(id));
+    }
+    
+    
     [HttpGet]
     [Authorize(Roles = "SuperAdmin, Operator")]
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)

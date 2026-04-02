@@ -57,6 +57,23 @@ public class InstitutionService : IInstitutionService
         return newInstitution.Adapt<GetInstitutionResponse>();
     }
 
+    public async Task<GetInstitutionResponse> GetByIdAsync(Guid? institutionsId)
+    {
+        if (institutionsId is null)
+        {
+            throw new UserNotBoundToInstitutionException();
+        }
+        
+        var institution = await _institutionRepository.GetByIdAsync(institutionsId.Value);
+        
+        if (institution is null)
+        {
+            throw new InstitutionNotFoundException();
+        }
+        
+        return institution.Adapt<GetInstitutionResponse>();
+    }
+    
     public async Task<PagedResponse<GetInstitutionResponse>> GetAllAsync(int pageNumber, int pageSize)
     {
         if (pageNumber < 1) pageNumber = 1;

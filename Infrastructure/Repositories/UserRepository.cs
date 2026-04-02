@@ -30,7 +30,7 @@ public class UserRepository : IUserRepository
         _context.Users.Remove(dbUser);
     }
 
-    public async Task<DbUser?> GetByIdAsync(Guid userId)
+    public async Task<DbUser?> GetByIdAsync(Guid? userId)
     {
         return await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
     }

@@ -28,7 +28,7 @@ public class UserService : IUserService
         _passwordService = passwordService;
     }
 
-    public async Task<GetUserResponse> GetMeAsync(Guid userId)
+    public async Task<GetUserResponse> GetMeAsync(Guid? userId)
     {
         if (Guid.Empty == userId)
         {
@@ -91,6 +91,23 @@ public class UserService : IUserService
         return response;
     }
 
+    public async Task<GetUserResponse> GetUserById(Guid? userId)
+    {
+        if (Guid.Empty == userId)
+        {
+            throw new BadRequestException("ID пользователя не может быть пустым");
+        }
+        
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        if (user is null)
+        {
+            throw new UserNotFoundException();
+        }
+        
+        return user.Adapt<GetUserResponse>();
+    }
+
     public async Task<PagedResponse<GetUserResponse>> GetAllUsers(int pageNumber, int pageSize, UserRole userRole, Guid? institutionId)
     { 
         if (pageNumber < 1) pageNumber = 1;
@@ -143,6 +160,11 @@ public class UserService : IUserService
             request.InstitutionId = institutionId;
         }
 
+        if (userId != id && userRole == UserRole.Operator && (userToUpdate.Role == UserRole.SuperAdmin || userToUpdate.Role == UserRole.Operator))
+        {
+            throw new ForbiddenException("У вас нет прав на изменение данного пользователя");
+        }
+        
         if (userRole == UserRole.Operator && (request.Role == UserRole.SuperAdmin || request.Role == UserRole.Operator))
         {
             throw new ForbiddenException("Оператор не может выдавать такие права");
@@ -151,11 +173,6 @@ public class UserService : IUserService
         if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && request.InstitutionId is null)
         {
             throw new UserNotBoundToInstitutionException();
-        }
-        
-        if (userId != id && userRole == UserRole.Operator && (userToUpdate.Role == UserRole.SuperAdmin || userToUpdate.Role == UserRole.Operator))
-        {
-            throw new ForbiddenException("У вас нет прав на изменение данного пользователя");
         }
 
         var checkEmailExist = await _userRepository.GetByEmailAsync(request.Email);
@@ -205,7 +222,7 @@ public class UserService : IUserService
         // todo Когда будет реализована работа с почтой, раскомментить проверку
         // if (userId == id)
         // {
-        //     throw new BadRequestException("Нельзя поменять пароль без подтверждения почты самому себе");
+        //     throw new BadRequestException("Нельзя поменять пароль самому себе без подтверждения почты");
         // }
         var userToUpdate = await _userRepository.GetByIdAsync(id);
         if (userToUpdate is null)

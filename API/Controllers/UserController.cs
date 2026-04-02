@@ -29,6 +29,12 @@ public class UserController : BaseController
         return Ok(await _userService.AddAsync(request, UserId, UserRole, InstitutionId));
     }
 
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        return Ok(await _userService.GetUserById(id));
+    }    
+    
     [HttpGet]
     [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
