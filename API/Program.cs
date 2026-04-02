@@ -50,12 +50,12 @@ app.UseSwaggerUI(c =>
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "BarsPnz API v1");
 });
 
-//todo расскомментить на проде
-// if (app.Environment.IsDevelopment())
-// {
-//     app.UseSwagger();
-//     app.UseSwaggerUI();
-// }
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    // app.UseCors("AllowLocalFront");
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
