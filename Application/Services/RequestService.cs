@@ -1,5 +1,9 @@
-﻿using Application.Dto.Requests.Requests;
+﻿using Application.Common.Pagination;
+using Application.Dto.Requests.Requests;
 using Application.Dto.Requests.Responses;
+using Application.Exceptions.Abstractions;
+using Application.Exceptions.Requests;
+using Application.Exceptions.Users;
 using Application.Interfaces;
 using Domain.DbModels;
 using Domain.Enums;
@@ -44,5 +48,73 @@ public class RequestService : IRequestService
             CreatedAt = dbRequest.CreatedAt,
             Status = dbRequest.Status
         };
+    }
+
+    public async Task<PagedResponse<GetRequestResponse>> GetAllAsync(int pageNumber, int pageSize)
+    {
+        if (pageNumber < 1) pageNumber = 1;
+
+        if (pageSize < 1) pageSize = 20;
+
+        if (pageSize > 50) pageSize = 50;
+
+        var requestsInfo = await  _requestRepository.GetAllAsync(pageNumber, pageSize, null);
+        var requests = requestsInfo.Requests.Adapt<List<GetRequestResponse>>();
+
+        return new PagedResponse<GetRequestResponse>
+        {
+            Items = requests,
+            PageInfo = new PageViewModel(pageNumber, requestsInfo.totalCount, pageSize)
+        };
+    }
+    
+    public async Task<PagedResponse<GetRequestResponse>> GetMyAsync(int pageNumber, int pageSize, Guid? userId)
+    {
+        if (pageNumber < 1) pageNumber = 1;
+
+        if (pageSize < 1) pageSize = 20;
+
+        if (pageSize > 50) pageSize = 50;
+
+        if (userId is null)
+        {
+            throw new UserNotFoundException();
+        }
+        var requestsInfo = await _requestRepository.GetAllAsync(pageNumber, pageSize, userId);
+        var requests = requestsInfo.Requests.Adapt<List<GetRequestResponse>>();
+
+        return new PagedResponse<GetRequestResponse>
+        {
+            Items = requests,
+            PageInfo = new PageViewModel(pageNumber, requestsInfo.totalCount, pageSize)
+        };
+    }
+
+    public async Task<GetRequestResponse> AssignToOperatorAsync(Guid? requestId, Guid operatorId)
+    {
+        if (Guid.Empty == requestId)
+        {
+            throw new BadRequestException("ID заявки не может быть пустым");
+        }
+
+        var request = await _requestRepository.GetByIdAsync(requestId);
+
+        if (request is null)
+        {
+            throw new RequestNotFoundException();
+        }
+        
+        if (request.OperatorId is not null)
+        {
+            throw new RequestAlreadyAssignedException();
+        }
+
+        request.OperatorId = operatorId;
+        
+        _requestRepository.UpdateAsync(request);
+        await _unitOfWork.SaveChangesAsync();
+
+        var response = request.Adapt<GetRequestResponse>();
+        return response;
     }
 }

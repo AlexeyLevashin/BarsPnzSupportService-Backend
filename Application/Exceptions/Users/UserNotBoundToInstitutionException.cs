@@ -2,4 +2,4 @@
 
 namespace Application.Exceptions.Users;
 
-public class UserNotBoundToInstitutionException(string? message ="Пользователи с ролями \"Пользователь\" или \"Админ Учреждения\" должены быть привязаны к учрежению") : BadRequestException(message);
+public class UserNotBoundToInstitutionException(string? message ="Учетная запись должна быть связана с учреждением") : BadRequestException(message);
