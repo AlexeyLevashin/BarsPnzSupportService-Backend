@@ -90,7 +90,7 @@ public class RequestService : IRequestService
         };
     }
 
-    public async Task<GetRequestResponse> AssignToOperatorAsync(Guid? requestId, Guid operatorId)
+    public async Task AssignToOperatorAsync(Guid? requestId, Guid operatorId)
     {
         if (Guid.Empty == requestId)
         {
@@ -111,10 +111,6 @@ public class RequestService : IRequestService
 
         request.OperatorId = operatorId;
         
-        _requestRepository.UpdateAsync(request);
         await _unitOfWork.SaveChangesAsync();
-
-        var response = request.Adapt<GetRequestResponse>();
-        return response;
     }
 }

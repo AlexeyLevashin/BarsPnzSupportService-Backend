@@ -9,7 +9,10 @@ public class GetRequestResponse
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ClosedAt { get; set; }
     public Guid ClientId { get; set; }
+    public string ClientFullName { get; set; }
+    public string? InstitutionName { get; set; }
     public Guid? OperatorId { get; set; }
+    public string? OperatorFullName { get; set; }
     public RequestStatus Status { get; set; }
     public Priority Priority { get; set; }
 }

@@ -27,8 +27,12 @@ public class RequestRepository : IRequestRepository
 
     public async Task<(List<DbRequest> Requests, int totalCount)> GetAllAsync(int pageNumber, int pageSize, Guid? userId = null)
     {
-        var query = _context.Requests.AsNoTracking();
-
+        IQueryable<DbRequest> query = _context.Requests
+            .AsNoTracking()
+            .Include(c => c.Client)
+                .ThenInclude(i => i.Institution)
+            .Include(o => o.Operator);
+        
         if (userId.HasValue)
         {
             query = query.Where(r => r.ClientId == userId);

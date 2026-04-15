@@ -24,21 +24,22 @@ public class RequestController : BaseController
 
     [HttpGet("all")]
     [Authorize(Roles = "SuperAdmin, Operator")]
-    public async Task<IActionResult> GetAll(int pageNumber, int pageSize)
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        return Ok(await _requestService.GetAllAsync(pageNumber, pageSize));
+        return Ok(await _requestService.GetAllAsync(page, pageSize));
     }
 
     [HttpGet("all/my")]
-    public async Task<IActionResult> GetMy(int pageNumber, int pageSize)
+    public async Task<IActionResult> GetMy([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        return Ok(await _requestService.GetMyAsync(pageNumber, pageSize, UserId));
+        return Ok(await _requestService.GetMyAsync(page, pageSize, UserId));
     }
 
     [HttpPatch("{id}")]
     [Authorize(Roles = "SuperAdmin, Operator")]
     public async Task<IActionResult> AssignToOperator(Guid id)
     {
-        return Ok(await _requestService.AssignToOperatorAsync(id, UserId));
+        await _requestService.AssignToOperatorAsync(id, UserId);
+        return Ok();
     }
 }

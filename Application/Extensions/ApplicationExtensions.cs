@@ -1,5 +1,8 @@
-﻿using Application.Interfaces;
+﻿using System.Reflection;
+using Application.Interfaces;
 using Application.Services;
+using Mapster;
+using MapsterMapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,6 +18,9 @@ public static class ApplicationExtensions
         services.AddScoped<IRequestService, RequestService>();
         services.AddScoped<IMessageService, MessageService>();
 
+        var config = TypeAdapterConfig.GlobalSettings;
+        config.Scan(Assembly.GetExecutingAssembly()); 
+        
         return services;
     }
 }
