@@ -13,7 +13,7 @@ public class DbRequest
     public RequestStatus Status { get; set; }
     public Priority Priority { get; set; }
     public DbUser Client { get; set; }
-    public DbUser Operator { get; set; }
+    public DbUser? Operator { get; set; }
     
     public List<DbMessage> Messages { get; set; } = new();
 }
