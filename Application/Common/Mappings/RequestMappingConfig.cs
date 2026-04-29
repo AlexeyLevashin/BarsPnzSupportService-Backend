@@ -1,4 +1,5 @@
-﻿using Mapster;
+﻿using Application.Dto.Messages.Responses;
+using Mapster;
 using Domain.DbModels;
 using Application.Dto.Requests.Responses;
 
@@ -18,5 +19,9 @@ public class RequestMappingConfig : IRegister
             .Map(dest => dest.OperatorFullName, 
                 src => src.Operator != null 
                     ? $"{src.Operator.Surname} {src.Operator.Name} {src.Operator.Patronymic}".Trim() : null);
+
+        config.NewConfig<DbMessage, GetMessageResponse>()
+            .Map(dest => dest.SenderFullName,
+                src => $"{src.Sender.Surname} {src.Sender.Name} {src.Sender.Patronymic}".Trim());
     }
 }

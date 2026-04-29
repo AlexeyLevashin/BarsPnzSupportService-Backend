@@ -5,10 +5,12 @@ using Application.Exceptions.Abstractions;
 using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
 using Application.Interfaces;
+using Application.Interfaces.Hubs;
 using Domain.DbModels;
 using Domain.Enums;
 using Domain.Interfaces;
 using Mapster;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Application.Services;
 
@@ -18,14 +20,16 @@ public class RequestService : IRequestService
     private readonly IMessageRepository _messageRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserRepository _userRepository;
+    private readonly IRequestNotificationService _notificationService;
 
     public RequestService(IRequestRepository requestRepository, IMessageRepository messageRepository,
-        IUnitOfWork unitOfWork, IUserRepository userRepository)
+        IUnitOfWork unitOfWork, IUserRepository userRepository, IRequestNotificationService notificationService)
     {
         _requestRepository = requestRepository;
         _messageRepository = messageRepository;
         _unitOfWork = unitOfWork;
         _userRepository = userRepository;
+        _notificationService = notificationService;
     }
     
     public async Task<CreateRequestResponse> AddAsync(CreateRequestRequest request, Guid userId)
@@ -42,6 +46,12 @@ public class RequestService : IRequestService
         await _requestRepository.CreateAsync(dbRequest);
         await _unitOfWork.SaveChangesAsync();
 
+        var fullRequest = await _requestRepository.GetByIdAsync(dbRequest.Id);
+
+        var getRequestResponse = fullRequest.Adapt<GetRequestResponse>();
+    
+        await _notificationService.NotifyNewRequestAsync(getRequestResponse);
+        
         return new CreateRequestResponse
         {
             Id = dbRequest.Id,
@@ -58,7 +68,7 @@ public class RequestService : IRequestService
 
         if (pageSize > 50) pageSize = 50;
 
-        var requestsInfo = await  _requestRepository.GetAllAsync(pageNumber, pageSize, null);
+        var requestsInfo = await  _requestRepository.GetAllAsync(pageNumber, pageSize);
         var requests = requestsInfo.Requests.Adapt<List<GetRequestResponse>>();
 
         return new PagedResponse<GetRequestResponse>
@@ -90,6 +100,23 @@ public class RequestService : IRequestService
         };
     }
 
+    public async Task<GetRequestResponse> GetRequestByIdAsync(Guid? id)
+    {
+        if (Guid.Empty == id)
+        {
+            throw new BadRequestException("ID заявки не может быть пустым");
+        }
+
+        var request = await _requestRepository.GetByIdAsync(id);
+
+        if (request is null)
+        {
+            throw new RequestNotFoundException();
+        }
+
+        return request.Adapt<GetRequestResponse>();
+    }
+    
     public async Task AssignToOperatorAsync(Guid? requestId, Guid operatorId)
     {
         if (Guid.Empty == requestId)

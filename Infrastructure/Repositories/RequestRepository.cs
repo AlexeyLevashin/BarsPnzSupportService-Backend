@@ -1,4 +1,5 @@
-﻿using Domain.DbModels;
+﻿using System.Security.Claims;
+using Domain.DbModels;
 using Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Internal;
@@ -22,7 +23,11 @@ public class RequestRepository : IRequestRepository
 
     public async Task<DbRequest?> GetByIdAsync(Guid? id)
     {
-        return await _context.Requests.FirstOrDefaultAsync(r => r.Id == id);
+        return await _context.Requests
+            .Include(c => c.Client)
+                .ThenInclude(i => i.Institution)
+            .Include(o => o.Operator)
+            .FirstOrDefaultAsync(r => r.Id == id);
     }
 
     public async Task<(List<DbRequest> Requests, int totalCount)> GetAllAsync(int pageNumber, int pageSize, Guid? userId = null)
