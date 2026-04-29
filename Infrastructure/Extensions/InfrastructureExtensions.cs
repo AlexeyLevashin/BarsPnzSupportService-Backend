@@ -1,9 +1,11 @@
 ﻿using System.Text;
 using Application.Authentication;
 using Application.Interfaces.Authentication;
+using Application.Interfaces.Hubs;
 using Domain.Interfaces;
 using Infrastructure.Authentication;
 using Infrastructure.Common;
+using Infrastructure.Hubs;
 using Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +28,7 @@ public static class InfrastructureExtensions
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPasswordService, PasswordService>();
+        services.AddScoped<IRequestNotificationService, SignalRNotifier>();
         services.AddMappings();
         
         return services;
@@ -61,8 +64,22 @@ public static class InfrastructureExtensions
             })
             .AddJwtBearer(options =>
             {
-                options.TokenValidationParameters = tokenValidationParameters;
+                options.TokenValidationParameters = tokenValidationParameters; 
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/requests"))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
             });
         return services;
     }
 }
+

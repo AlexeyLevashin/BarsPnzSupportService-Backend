@@ -7,5 +7,6 @@ public enum RequestStatus
     ClientDataRequest = 2,
     PendingReview = 3,
     Closed = 4,
-    Canceled = 5
+    Canceled = 5,
+    Analysis = 6
 }
