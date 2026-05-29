@@ -53,6 +53,9 @@ services:
       - JwtSettings__SecretKey=your-very-long-and-secure-secret-key-for-production-use-jb5k34jjk-45j354jkgnj-435tbkj45tk-45tjmbjkgnjkbk3-5n43bjgkb4jgbk-45ktkl3-5gtl4-43g54-g5gkn4kgn3
       - JwtSettings__Issuer=BarsPnz-Local
       - JwtSettings__Audience=BarsPnz-Local
+      - Minio__Endpoint=minio-s3:9000
+      - Minio__AccessKey=${MINIO_ROOT_USER}
+      - Minio__SecretKey=${MINIO_ROOT_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
