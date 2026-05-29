@@ -36,10 +36,10 @@ namespace Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("FileSize")
-                        .HasColumnType("integer");
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
 
-                    b.Property<Guid>("MessageId")
+                    b.Property<Guid?>("MessageId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("StorageKey")
@@ -208,9 +208,7 @@ namespace Persistence.Migrations
                 {
                     b.HasOne("Domain.DbModels.DbMessage", "Message")
                         .WithMany("Attachments")
-                        .HasForeignKey("MessageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("MessageId");
 
                     b.Navigation("Message");
                 });

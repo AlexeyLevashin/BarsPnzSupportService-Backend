@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using Application.Common.Minio;
 using Application.Interfaces;
 using Application.Services;
 using Mapster;
@@ -10,14 +11,16 @@ namespace Application.Extensions;
 
 public static class ApplicationExtensions
 {
-    public static IServiceCollection AddApplication(this IServiceCollection services)
+    public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IInstitutionService, InstitutionService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IRequestService, RequestService>();
         services.AddScoped<IMessageService, MessageService>();
-
+        services.AddScoped<IAttachmentService, AttachmentService>();
+        services.Configure<FileUploadOptions>(configuration.GetSection("FileUpload"));
+        
         var config = TypeAdapterConfig.GlobalSettings;
         config.Scan(Assembly.GetExecutingAssembly()); 
         

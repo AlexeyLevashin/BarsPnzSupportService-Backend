@@ -13,5 +13,5 @@ public class DbMessage
     public Guid RequestId { get; set; }
     public DbUser Sender { get; set; }
     public DbRequest Request { get; set; }
-    public List<DbAttachment> Attachments { get; set; } = new();
+    public ICollection<DbAttachment> Attachments { get; set; } = new List<DbAttachment>();
 }

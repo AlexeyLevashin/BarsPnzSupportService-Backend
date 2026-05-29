@@ -19,14 +19,16 @@ public class MessageService : IMessageService
     private readonly IRequestRepository _requestRepository;
     private readonly IRequestNotificationService _notificationService;
     private readonly IUserRepository _userRepository;
+    private readonly IAttachmentRepository _attachmentRepository;
     
-    public MessageService(IMessageRepository messageRepository, IUnitOfWork unitOfWork, IRequestRepository requestRepository, IRequestNotificationService notificationService, IUserRepository userRepository)
+    public MessageService(IMessageRepository messageRepository, IUnitOfWork unitOfWork, IRequestRepository requestRepository, IRequestNotificationService notificationService, IUserRepository userRepository, IAttachmentRepository attachmentRepository)
     {
         _messageRepository = messageRepository;
         _unitOfWork = unitOfWork;
         _requestRepository = requestRepository;
         _notificationService = notificationService;
         _userRepository = userRepository;
+        _attachmentRepository = attachmentRepository;
     }
 
     public async Task<GetMessageResponse> AddAsync(Guid requestId, CreateMessageRequest request, Guid senderId, UserRole userRole)
@@ -50,6 +52,11 @@ public class MessageService : IMessageService
         await _messageRepository.CreateAsync(dbMessage);
         await _unitOfWork.SaveChangesAsync();
 
+        if (request.AttachmentIds != null && request.AttachmentIds.Any())
+        {
+            await _attachmentRepository.AttachFilesToMessageAsync(request.AttachmentIds, dbMessage.Id);
+        }
+        
         var fullMessage = await _messageRepository.GetByIdAsync(dbMessage.Id);
 
         var response = fullMessage.Adapt<GetMessageResponse>();
