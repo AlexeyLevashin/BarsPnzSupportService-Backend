@@ -1,4 +1,5 @@
-﻿using Domain.Enums;
+﻿using Application.Dto.Attachments.Responses;
+using Domain.Enums;
 
 namespace Application.Dto.Messages.Responses;
 
@@ -11,4 +12,5 @@ public class GetMessageResponse
     public string SenderFullName { get; set; }
     public Guid SenderId { get; set; }
     public Guid RequestId { get; set; }
+    public List<GetAttachmentResponse> Attachments { get; set; } = new();
 }

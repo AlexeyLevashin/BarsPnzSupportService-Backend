@@ -39,3 +39,6 @@ Desktop.ini
 **/packages/*
 !**/packages/build/
 project.lock.json
+
+# Мои тестовые наброски
+Tests/

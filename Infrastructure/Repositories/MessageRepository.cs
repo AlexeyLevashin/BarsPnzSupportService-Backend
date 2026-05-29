@@ -1,4 +1,5 @@
-﻿using Application.Common.Pagination;
+﻿using System.Net.Mail;
+using Application.Common.Pagination;
 using Application.Dto.Messages.Responses;
 using Domain.DbModels;
 using Domain.Interfaces;
@@ -33,22 +34,24 @@ public class MessageRepository : IMessageRepository
             .Include(m => m.Sender)
             .Where(m => m.RequestId == requestId)
             .Where(m => m.Type == type);
-
+            
         var count = await query.CountAsync();
 
-        var requests = await query
+        var messages = await query
+            .Include(m => m.Attachments)
             .OrderByDescending(m => m.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
-        return (requests, count);
-    }
+        return (messages, count);
+    }   
 
     public async Task<DbMessage?> GetByIdAsync(Guid messageId)
     {
         return await _context.Messages
             .Include(u => u.Sender)
+            .Include(m => m.Attachments)
             .FirstOrDefaultAsync(m => m.Id == messageId);
     } 
 }

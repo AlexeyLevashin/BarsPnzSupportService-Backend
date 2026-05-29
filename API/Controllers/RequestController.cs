@@ -2,6 +2,7 @@
 using Application.Dto.Messages.Requests;
 using Application.Dto.Requests.Requests;
 using Application.Interfaces;
+using Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,15 +13,17 @@ public class RequestController : BaseController
 {
     private readonly IRequestService _requestService;
     private readonly IMessageService _messageService;
+    private readonly IAttachmentService _attachmentService;
 
-    public RequestController(IRequestService requestService, IMessageService messageService)
+    public RequestController(IRequestService requestService, IMessageService messageService, IAttachmentService attachmentService)
     {
         _requestService = requestService;
         _messageService = messageService;
+        _attachmentService = attachmentService;
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromForm] CreateRequestRequest request)
+    public async Task<IActionResult> Create(CreateRequestRequest request)
     {
         return Ok(await _requestService.AddAsync(request, UserId));
     }
@@ -53,7 +56,7 @@ public class RequestController : BaseController
     }
     
     [HttpPost("{requestId}/messages")]
-    public async Task<IActionResult> Add(Guid requestId, [FromForm] CreateMessageRequest request)
+    public async Task<IActionResult> Add(Guid requestId, CreateMessageRequest request)
     {
         return Ok(await _messageService.AddAsync(requestId, request, UserId, UserRole));
     }

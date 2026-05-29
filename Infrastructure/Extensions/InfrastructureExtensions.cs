@@ -2,15 +2,19 @@
 using Application.Authentication;
 using Application.Interfaces.Authentication;
 using Application.Interfaces.Hubs;
+using Application.Interfaces.Repositories;
 using Domain.Interfaces;
 using Infrastructure.Authentication;
 using Infrastructure.Common;
 using Infrastructure.Hubs;
 using Infrastructure.Repositories;
+using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Minio;
 
 namespace Infrastructure.Extensions;
 
@@ -21,15 +25,19 @@ public static class InfrastructureExtensions
         services.AddScoped<IJwtProvider, JwtProvider>();
 
         services.AddAuthentication(configuration);
-
+        services.AddMinio(configuration);
+        
         services.AddScoped<IInstitutionRepository, InstitutionRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRequestRepository, RequestRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPasswordService, PasswordService>();
+        services.AddScoped<IAttachmentRepository, AttachmentRepository>();
         services.AddScoped<IRequestNotificationService, SignalRNotifier>();
+        services.AddScoped<IMinioFileStorageService, MinioFileStorageService>();
         services.AddMappings();
+        
         
         return services;
     }
@@ -79,6 +87,27 @@ public static class InfrastructureExtensions
                     }
                 };
             });
+        return services;
+    }
+
+    public static IServiceCollection AddMinio(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<MinioOptions>()
+            .Bind(configuration.GetSection("Minio"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<IMinioClient>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<MinioOptions>>().Value;
+
+            return new MinioClient()
+                .WithEndpoint(options.Endpoint)
+                .WithCredentials(options.AccessKey, options.SecretKey)
+                .WithSSL(options.UseSSL)
+                .Build();
+        });
+
         return services;
     }
 }
