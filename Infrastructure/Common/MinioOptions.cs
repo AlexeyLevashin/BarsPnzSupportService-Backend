@@ -12,4 +12,5 @@ public class MinioOptions
     public string SecretKey { get; set; } = string.Empty;
     public bool UseSSL { get; set; }
     public int PresignedUrlExpiryHours { get; set; } = 24;
+    public string ExternalEndpoint { get; set; }
 }

@@ -56,6 +56,8 @@ services:
       - Minio__Endpoint=minio-s3:9000
       - Minio__AccessKey=${MINIO_ROOT_USER}
       - Minio__SecretKey=${MINIO_ROOT_PASSWORD}
+      - Minio__UseSSL=false
+      - Minio__ExternalEndpoint=https://bars-1.tail686649.ts.net:8443/minio
     depends_on:
       db:
         condition: service_healthy
