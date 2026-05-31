@@ -47,7 +47,17 @@ public class MinioFileStorageService : IMinioFileStorageService
             });
         }
 
-        return await _minio.PresignedGetObjectAsync(args);
+        var internalUrl = await _minio.PresignedGetObjectAsync(args);
+
+        if (!string.IsNullOrWhiteSpace(_options.ExternalEndpoint))
+        {
+            string scheme = _options.UseSSL ? "https://" : "http://";
+            string internalBase = $"{scheme}{_options.Endpoint}";
+
+            return internalUrl.Replace(internalBase, _options.ExternalEndpoint);
+        }
+
+        return internalUrl;
     }
     
     public async Task DeleteAsync(string objectName, string bucket)
