@@ -41,7 +41,14 @@ public class UserController : BaseController
     {
         return Ok(await _userService.GetAllUsers(page, pageSize, UserRole, InstitutionId));
     }
-
+    
+    [HttpGet("operators")]
+    [Authorize(Roles = "Operator, SuperAdmin")]
+    public async Task<IActionResult> GetSupervisors()
+    {
+        return Ok(await _userService.GetSupervisorsAsync());
+    }
+    
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, CreateUserByAdminRequest request)
     {

@@ -1,6 +1,7 @@
 ﻿using Application.Common.Pagination;
 using Application.Dto.Messages.Requests;
 using Application.Dto.Messages.Responses;
+using Application.Exceptions.Messages;
 using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
 using Application.Interfaces;
@@ -39,6 +40,11 @@ public class MessageService : IMessageService
         {
             throw new RequestNotFoundException();
         }
+
+        if (requestCheck.ClientId != senderId && (userRole == UserRole.User || userRole == UserRole.UserAdmin))
+        {
+            throw new UnacceptableRequestException();
+        }
         
         var dbMessage = request.Adapt<DbMessage>();
         dbMessage.RequestId = requestId;
@@ -48,7 +54,22 @@ public class MessageService : IMessageService
         {
             dbMessage.Type = MessageType.Public;
         }
+        
+        if (userRole == UserRole.Operator || userRole == UserRole.SuperAdmin)
+        {
+            bool checkUserAssignToRequest = await _requestRepository.CheckAlreadyAssigned(requestId, senderId);
+            
+            if(!checkUserAssignToRequest && request.Type == MessageType.Public)
+                throw new NoOperatorAssignedToRequest();
+        }
+        
+        requestCheck.Status = ChangeStatusAsync(requestCheck.Status, request.Status, userRole, request.Type);
 
+        if (requestCheck.Status == RequestStatus.Canceled || requestCheck.Status == RequestStatus.Closed)
+        {
+            requestCheck.ClosedAt = DateTime.UtcNow;
+        }
+        
         await _messageRepository.CreateAsync(dbMessage);
         await _unitOfWork.SaveChangesAsync();
 
@@ -113,5 +134,30 @@ public class MessageService : IMessageService
             Items = messages,
             PageInfo = new PageViewModel(pageNumber, messagesInfo.totalCount, pageSize)
         };
+    }
+    
+    private RequestStatus ChangeStatusAsync(RequestStatus currentStatus, RequestStatus status, UserRole userRole, MessageType type)
+    {
+        if ((currentStatus == RequestStatus.Canceled || currentStatus == RequestStatus.Closed) && type == MessageType.Public)
+        {
+            throw new RequestIsClosedException();
+        }
+            
+        if ((userRole == UserRole.User || userRole == UserRole.UserAdmin) && status != RequestStatus.Closed)
+        {
+            return currentStatus == RequestStatus.New ? RequestStatus.New : RequestStatus.InProgress;
+        }
+        
+        if ((userRole == UserRole.Operator || userRole == UserRole.SuperAdmin) && type == MessageType.Internal)
+        {
+            return currentStatus;
+        }
+
+        if (status == RequestStatus.New)
+        {
+            return currentStatus;
+        }
+        
+        return status;
     }
 }

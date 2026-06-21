@@ -10,6 +10,7 @@ using Domain.DbModels;
 using Domain.Enums;
 using Domain.Interfaces;
 using Mapster;
+using StackExchange.Redis;
 
 namespace Application.Services;
 
@@ -136,6 +137,14 @@ public class UserService : IUserService
         };
     }
 
+    public async Task<List<GetOperatorResponse>> GetSupervisorsAsync()
+    {
+        var roles = new List<UserRole> { UserRole.Operator, UserRole.SuperAdmin };
+        var users = await _userRepository.GetByRolesAsync(roles);
+        var result = users.Adapt<List<GetOperatorResponse>>();
+        return result;
+    }
+    
     public async Task<GetUserResponse> UpdateAsync(CreateUserByAdminRequest request, Guid userId, Guid id, UserRole userRole, Guid? institutionId)
     {
         var userToUpdate = await _userRepository.GetByIdAsync(id);

@@ -1,4 +1,5 @@
-﻿using API.Controllers.Abstractions;
+﻿using System.ComponentModel.DataAnnotations;
+using API.Controllers.Abstractions;
 using Application.Dto.Messages.Requests;
 using Application.Dto.Requests.Requests;
 using Application.Interfaces;
@@ -47,11 +48,19 @@ public class RequestController : BaseController
         return Ok(await _requestService.GetRequestByIdAsync(id));
     }
     
-    [HttpPatch("{id}")]
+    [HttpPost("{id}/take")]
     [Authorize(Roles = "SuperAdmin, Operator")]
-    public async Task<IActionResult> AssignToOperator(Guid? id)
+    public async Task<IActionResult> AssignToMe(Guid id)
     {
         await _requestService.AssignToOperatorAsync(id, UserId);
+        return Ok();
+    }
+    
+    [HttpPost("{requestId}/assign")]
+    [Authorize(Roles = "SuperAdmin, Operator")]
+    public async Task<IActionResult> AssignToOperator(Guid requestId, AssignOperatorRequest request)
+    {
+        await _requestService.AssignToOperatorAsync(requestId, request.OperatorId);
         return Ok();
     }
     
@@ -72,5 +81,12 @@ public class RequestController : BaseController
     public async Task<IActionResult> GetComments(Guid requestId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         return Ok(await _messageService.GetAllCommentsAsync(page, pageSize, requestId));
+    }
+
+    [HttpPatch("{requestId}/status")]
+    public async Task<IActionResult> ChangeStatus(Guid requestId, UpdateStatusRequest request)
+    {
+        await _requestService.TerminateAsync(requestId, request, UserId, UserRole);
+        return Ok();
     }
 }

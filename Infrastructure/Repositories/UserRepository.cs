@@ -27,7 +27,7 @@ public class UserRepository : IUserRepository
 
     public void DeleteAsync(DbUser dbUser)
     {
-        _context.Users.Remove(dbUser);
+        dbUser.IsDeleted = true;
     }
 
     public async Task<DbUser?> GetByIdAsync(Guid? userId)
@@ -40,6 +40,11 @@ public class UserRepository : IUserRepository
         return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
     }
 
+    public async Task<bool> IsEmailTakenAsync(string email)
+    {
+        return await _context.Users.IgnoreQueryFilters().AnyAsync(u => u.Email == email);
+    }
+    
     public async Task<(List<DbUser> Users, int totalCount)> GetAllAsync(int pageNumber, int pageSize, Guid? institutionId = null)
     {
         var query = _context.Users.AsNoTracking();
@@ -59,6 +64,12 @@ public class UserRepository : IUserRepository
         return (users, count);
     }
 
+    public async Task<List<DbUser>> GetByRolesAsync(List<UserRole> roles)
+    {
+        var users = _context.Users.AsNoTracking();
+        return await users.Where(u => roles.Contains(u.Role)).ToListAsync();
+    }
+    
     public async Task<bool> HasAdminAsync()
     {
         return await _context.Users.AnyAsync(u => u.Role == UserRole.SuperAdmin);
