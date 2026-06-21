@@ -56,9 +56,7 @@ public class AuthService : IAuthService
 
     public async Task<LoginSuccessResponse> RegisterAsync(RegisterRequest request)
     {
-        var user = await _userRepository.GetByEmailAsync(request.Email);
-
-        if (user is not null)
+        if (await _userRepository.IsEmailTakenAsync(request.Email))
         {
             throw new UserWithEmailIsAlreadyExistException();
         }

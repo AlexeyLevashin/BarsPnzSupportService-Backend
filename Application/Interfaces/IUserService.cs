@@ -13,6 +13,7 @@ public interface IUserService
     public Task<CreateUserResponse> AddAsync(CreateUserByAdminRequest request, Guid userId, UserRole userRole, Guid? institutionId);
     public Task<GetUserResponse> GetUserById(Guid? userId);
     public Task<PagedResponse<GetUserResponse>> GetAllUsers(int pageNumber, int pageSize, UserRole userRole,  Guid? institutionId);
+    public Task<List<GetOperatorResponse>> GetSupervisorsAsync();
     public Task<GetUserResponse> UpdateAsync(CreateUserByAdminRequest request, Guid userId, Guid id, UserRole userRole, Guid? institutionId);
     public Task UpdatePasswordAsync(UpdateUserPasswordRequest request, Guid userId);
     public Task<CreateUserResponse> ForceResetPasswordAsync(Guid userId, Guid id, UserRole userRole, Guid? institutionId);

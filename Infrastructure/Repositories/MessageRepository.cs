@@ -30,6 +30,7 @@ public class MessageRepository : IMessageRepository
     public async Task<(List<DbMessage> Messages, int totalCount)> GetAllAsync(int pageNumber, int pageSize, Guid? requestId, MessageType type)
     {
         IQueryable<DbMessage> query = _context.Messages
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(m => m.Sender)
             .Where(m => m.RequestId == requestId)

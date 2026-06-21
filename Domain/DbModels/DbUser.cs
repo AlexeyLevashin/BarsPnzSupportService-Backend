@@ -11,6 +11,8 @@ public class DbUser
     public string Email { get; set; }
     public string PasswordHash { get; set; }
     public UserRole Role { get; set; }
+    public bool IsDeleted { get; set; } = false;
     public Guid? InstitutionId { get; set; }
+    public List<DbRequest> Requests { get; set; } = new();
     public DbInstitution? Institution { get; set; }
 }   

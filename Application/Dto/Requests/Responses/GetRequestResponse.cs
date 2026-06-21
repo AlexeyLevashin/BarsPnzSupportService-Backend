@@ -1,4 +1,5 @@
-﻿using Domain.Enums;
+﻿using Application.Dto.Users.Responses;
+using Domain.Enums;
 
 namespace Application.Dto.Requests.Responses;
 
@@ -11,8 +12,7 @@ public class GetRequestResponse
     public Guid ClientId { get; set; }
     public string ClientFullName { get; set; }
     public string? InstitutionName { get; set; }
-    public Guid? OperatorId { get; set; }
-    public string? OperatorFullName { get; set; }
+    public List<GetOperatorResponse> Operators { get; set; } = new();
     public RequestStatus Status { get; set; }
     public Priority Priority { get; set; }
 }

@@ -24,19 +24,28 @@ public class RequestRepository : IRequestRepository
     public async Task<DbRequest?> GetByIdAsync(Guid? id)
     {
         return await _context.Requests
+            .IgnoreQueryFilters()
             .Include(c => c.Client)
                 .ThenInclude(i => i.Institution)
-            .Include(o => o.Operator)
+            .Include(o => o.Operators)
+            .FirstOrDefaultAsync(r => r.Id == id);
+    }
+    
+    public async Task<DbRequest?> GetByIdForAssignmentAsync(Guid? id)
+    {
+        return await _context.Requests
+            .Include(o => o.Operators)
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
     public async Task<(List<DbRequest> Requests, int totalCount)> GetAllAsync(int pageNumber, int pageSize, Guid? userId = null)
     {
         IQueryable<DbRequest> query = _context.Requests
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(c => c.Client)
                 .ThenInclude(i => i.Institution)
-            .Include(o => o.Operator);
+            .Include(o => o.Operators);
         
         if (userId.HasValue)
         {
@@ -53,9 +62,10 @@ public class RequestRepository : IRequestRepository
 
         return (requests, count);
     }
-
-    public void UpdateAsync(DbRequest dbRequest)
+    
+    public async Task<bool> CheckAlreadyAssigned(Guid requestId, Guid operatorId)
     {
-        _context.Requests.Update(dbRequest);
+         return await _context.Requests
+            .AnyAsync(r => r.Id == requestId && r.Operators.Any(o => o.Id == operatorId));
     }
 }

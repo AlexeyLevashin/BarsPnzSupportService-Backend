@@ -2,6 +2,7 @@
 using Application.Dto.Requests.Requests;
 using Application.Dto.Requests.Responses;
 using Application.Exceptions.Abstractions;
+using Application.Exceptions.Messages;
 using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
 using Application.Interfaces;
@@ -125,27 +126,81 @@ public class RequestService : IRequestService
         return request.Adapt<GetRequestResponse>();
     }
     
-    public async Task AssignToOperatorAsync(Guid? requestId, Guid operatorId)
+    public async Task AssignToOperatorAsync(Guid requestId, Guid operatorId)
     {
         if (Guid.Empty == requestId)
         {
             throw new BadRequestException("ID заявки не может быть пустым");
         }
 
-        var request = await _requestRepository.GetByIdAsync(requestId);
+        var request = await _requestRepository.GetByIdForAssignmentAsync(requestId);
 
         if (request is null)
         {
             throw new RequestNotFoundException();
         }
-        
-        if (request.OperatorId is not null)
+
+        if (request.Status == RequestStatus.New)
         {
-            throw new RequestAlreadyAssignedException();
+            request.Status = RequestStatus.InProgress;
+        }
+        
+        var dbOperator = await _userRepository.GetByIdAsync(operatorId);
+
+        if (dbOperator is null)
+        {
+            throw new UserNotFoundException();  
         }
 
-        request.OperatorId = operatorId;
+        if (dbOperator.Role == UserRole.User || dbOperator.Role == UserRole.UserAdmin)
+        {
+            throw new ForbiddenException("Пользователя с данной ролью нельзя назначить оператором");
+        }
         
+        if (await _requestRepository.CheckAlreadyAssigned(requestId, operatorId))
+        {
+            throw new OperatorAlreadyAssignedException();
+        }
+        
+        request.Operators.Add(dbOperator);
+        
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task TerminateAsync(Guid requestId, UpdateStatusRequest request, Guid userId, UserRole userRole)
+    {
+        var requestCheck = await _requestRepository.GetByIdAsync(requestId);
+
+        if (requestCheck is null)
+        {
+            throw new RequestNotFoundException();
+        }
+
+        if (request.Status != RequestStatus.Canceled && request.Status != RequestStatus.Closed)
+        {
+            throw new UnacceptableStatusException();
+        }
+
+        if (requestCheck.ClientId != userId && (userRole == UserRole.User || userRole == UserRole.UserAdmin))
+        {
+            throw new UnacceptableRequestException();
+        }
+        
+        if (userRole == UserRole.Operator || userRole == UserRole.SuperAdmin)
+        {
+            bool checkUserAssignToRequest = await _requestRepository.CheckAlreadyAssigned(requestId, userId);
+            
+            if(!checkUserAssignToRequest)
+                throw new NoOperatorAssignedToRequest();
+        }
+
+        if (request.Status == RequestStatus.Canceled && (userRole == UserRole.User || userRole == UserRole.UserAdmin))
+        {
+            throw new ForbiddenException("Пользователям с данной ролью доступно только закрытие заявки");
+        }
+        
+        requestCheck.Status = request.Status;
+        requestCheck.ClosedAt = DateTime.UtcNow;
         await _unitOfWork.SaveChangesAsync();
     }
 }

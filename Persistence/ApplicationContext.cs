@@ -24,11 +24,16 @@ public class ApplicationContext : DbContext
 
             entity.Property(u => u.Role).HasConversion<string>();
             
+            entity.Property(u => u.IsDeleted)
+                .HasDefaultValue(false);
+            
             entity.HasOne(u => u.Institution)
                 .WithMany(i => i.Users)
                 .HasForeignKey(u => u.InstitutionId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+        
+        modelBuilder.Entity<DbUser>().HasQueryFilter(u => !u.IsDeleted);
 
         modelBuilder.Entity<DbMessage>(entity =>
         {
@@ -54,11 +59,9 @@ public class ApplicationContext : DbContext
                 .HasForeignKey(r => r.ClientId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasOne(r => r.Operator)
-                .WithMany()
-                .HasForeignKey(r => r.OperatorId)
-                .IsRequired(false)
-                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasMany(r => r.Operators)
+                .WithMany(u => u.Requests)
+                .UsingEntity(j => j.ToTable("RequestOperators"));
         });
 
         modelBuilder.Entity<DbInstitution>(entity =>
