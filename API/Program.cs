@@ -3,6 +3,7 @@ using API.Extensions;
 using Infrastructure.Extensions;
 using Persistence.Extensions;
 using Application.Extensions;
+using Hangfire;
 using Infrastructure.Hubs;
 using Minio;
 using Minio.DataModel.Args;
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCustomControllers();
 builder.Services.AddSwaggerConfiguration();
+builder.Services.AddHangfireConfiguration(builder.Configuration);
 
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -35,6 +37,8 @@ app.UseMiddleware<ExceptionHandlingMiddlewares>();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseHangfireDashboard();
 
 app.MapControllers();
 app.MapHub<RequestHub>("/hubs/requests");
@@ -61,4 +65,8 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseHangfireJobs();
+
 app.Run();
+
+//todo добавить .HasFilter("\"Status\" IN (2, 3)"); в modelBuilder.Entity<DbRequest> в классе ApplicationContext, когда добавится история изменения статусов

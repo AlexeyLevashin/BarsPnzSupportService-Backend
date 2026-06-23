@@ -19,6 +19,7 @@ public static class ApplicationExtensions
         services.AddScoped<IRequestService, RequestService>();
         services.AddScoped<IMessageService, MessageService>();
         services.AddScoped<IAttachmentService, AttachmentService>();
+        services.AddScoped<IAutoCloseStaleRequestsJob, AutoCloseStaleRequestsJob>();
         services.Configure<FileUploadOptions>(configuration.GetSection("FileUpload"));
         
         var config = TypeAdapterConfig.GlobalSettings;

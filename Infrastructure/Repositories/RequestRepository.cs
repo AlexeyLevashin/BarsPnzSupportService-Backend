@@ -1,5 +1,6 @@
 ﻿using System.Security.Claims;
 using Domain.DbModels;
+using Domain.Enums;
 using Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Internal;
@@ -67,5 +68,13 @@ public class RequestRepository : IRequestRepository
     {
          return await _context.Requests
             .AnyAsync(r => r.Id == requestId && r.Operators.Any(o => o.Id == operatorId));
+    }
+
+    public async Task<List<DbRequest>> GetStaleRequestsAsync(DateTime deadline)
+    {
+        return await _context.Requests
+            .Where(r => r.Status == RequestStatus.PendingReview || r.Status == RequestStatus.ClientDataRequest)
+            .Where(r => r.Messages.Max(m => m.CreatedAt) <= deadline)
+            .ToListAsync();
     }
 }
