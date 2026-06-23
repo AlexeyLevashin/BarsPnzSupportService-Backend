@@ -1,5 +1,9 @@
 ﻿using System.Text.Json.Serialization;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace API.Extensions;
 
@@ -52,6 +56,21 @@ public static class ServiceCollectionExtensions
                 }
             });
         });
+
+        return services;
+    }
+
+    public static IServiceCollection AddHangfireConfiguration(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddHangfire(config => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(options => 
+                options.UseNpgsqlConnection(configuration.GetConnectionString("DefaultConnection"))
+            ));
+        
+        services.AddHangfireServer();
 
         return services;
     }
