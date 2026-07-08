@@ -14,13 +14,11 @@ public class RequestController : BaseController
 {
     private readonly IRequestService _requestService;
     private readonly IMessageService _messageService;
-    private readonly IAttachmentService _attachmentService;
 
-    public RequestController(IRequestService requestService, IMessageService messageService, IAttachmentService attachmentService)
+    public RequestController(IRequestService requestService, IMessageService messageService)
     {
         _requestService = requestService;
         _messageService = messageService;
-        _attachmentService = attachmentService;
     }
 
     [HttpPost]
@@ -48,20 +46,20 @@ public class RequestController : BaseController
         return Ok(await _requestService.GetRequestByIdAsync(id));
     }
     
-    [HttpPost("{id}/take")]
+    [HttpPost("{requestId}/operators")]
     [Authorize(Roles = "SuperAdmin, Operator")]
-    public async Task<IActionResult> AssignToMe(Guid id)
-    {
-        await _requestService.AssignToOperatorAsync(id, UserId);
-        return Ok();
-    }
-    
-    [HttpPost("{requestId}/assign")]
-    [Authorize(Roles = "SuperAdmin, Operator")]
-    public async Task<IActionResult> AssignToOperator(Guid requestId, AssignOperatorRequest request)
+    public async Task<IActionResult> AssignToOperator(Guid requestId, OperatorRequest request)
     {
         await _requestService.AssignToOperatorAsync(requestId, request.OperatorId);
         return Ok();
+    }
+
+    [HttpDelete("{requestId}/operators/{operatorId}")]
+    [Authorize(Roles = "SuperAdmin, Operator")]
+    public async Task<IActionResult> DeleteOperator(Guid requestId, Guid operatorId)
+    {
+        await _requestService.DeleteOperatorAsync(requestId, operatorId);
+        return NoContent();
     }
     
     [HttpPost("{requestId}/messages")]
@@ -86,7 +84,7 @@ public class RequestController : BaseController
     [HttpPatch("{requestId}/status")]
     public async Task<IActionResult> ChangeStatus(Guid requestId, UpdateStatusRequest request)
     {
-        await _requestService.TerminateAsync(requestId, request, UserId, UserRole);
+        await _requestService.ChangeStatusAsync(requestId, request, UserId, UserRole);
         return Ok();
     }
 }

@@ -4,6 +4,7 @@ using Domain.Enums;
 using Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Internal;
+using Microsoft.VisualBasic.CompilerServices;
 using Persistence;
 
 namespace Infrastructure.Repositories;
@@ -69,7 +70,7 @@ public class RequestRepository : IRequestRepository
          return await _context.Requests
             .AnyAsync(r => r.Id == requestId && r.Operators.Any(o => o.Id == operatorId));
     }
-
+    
     public async Task<List<DbRequest>> GetStaleRequestsAsync(DateTime deadline)
     {
         return await _context.Requests

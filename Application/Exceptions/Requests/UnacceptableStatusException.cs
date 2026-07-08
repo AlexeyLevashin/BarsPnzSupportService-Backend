@@ -2,4 +2,4 @@
 
 namespace Application.Exceptions.Requests;
 
-public class UnacceptableStatusException(string? message = "Нельзя закрыть заявку с выбранным статусом") : ConflictException(message);
+public class UnacceptableStatusException(string? message = "Текущий статус заявки не позволяет изменить статус на выбранный") : ConflictException(message);
