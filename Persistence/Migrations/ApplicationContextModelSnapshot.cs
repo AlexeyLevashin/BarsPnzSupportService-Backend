@@ -71,20 +71,74 @@ namespace Persistence.Migrations
                     b.ToTable("Attachments");
                 });
 
+            modelBuilder.Entity("Domain.DbModels.DbEmployee", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsUser")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Patronymic")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Surname")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Employees");
+                });
+
+            modelBuilder.Entity("Domain.DbModels.DbEmployeeInstitution", b =>
+                {
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("InstitutionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("JobTitleId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("EmployeeId", "InstitutionId");
+
+                    b.HasIndex("InstitutionId");
+
+                    b.HasIndex("JobTitleId");
+
+                    b.ToTable("EmployeeInstitutions");
+                });
+
             modelBuilder.Entity("Domain.DbModels.DbInstitution", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("HeadName")
-                        .HasColumnType("text");
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
-                    b.Property<string>("HeadPatronymic")
-                        .HasColumnType("text");
-
-                    b.Property<string>("HeadSurname")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("HeadId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("INN")
                         .IsRequired()
@@ -95,12 +149,33 @@ namespace Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("HeadId");
 
                     b.HasIndex("INN")
                         .IsUnique();
 
                     b.ToTable("Institutions");
+                });
+
+            modelBuilder.Entity("Domain.DbModels.DbJobTitle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("JobTitles");
                 });
 
             modelBuilder.Entity("Domain.DbModels.DbMessage", b =>
@@ -149,6 +224,9 @@ namespace Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("InstitutionId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Priority")
                         .IsRequired()
                         .HasColumnType("text");
@@ -167,6 +245,8 @@ namespace Persistence.Migrations
 
                     b.HasIndex("CreatedAt");
 
+                    b.HasIndex("InstitutionId");
+
                     b.HasIndex("Status");
 
                     b.ToTable("Requests");
@@ -182,7 +262,7 @@ namespace Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("InstitutionId")
+                    b.Property<Guid>("EmployeeId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
@@ -190,22 +270,11 @@ namespace Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Patronymic")
-                        .HasColumnType("text");
-
                     b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Surname")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -214,7 +283,8 @@ namespace Persistence.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.HasIndex("InstitutionId");
+                    b.HasIndex("EmployeeId")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });
@@ -241,6 +311,42 @@ namespace Persistence.Migrations
                         .HasForeignKey("MessageId");
 
                     b.Navigation("Message");
+                });
+
+            modelBuilder.Entity("Domain.DbModels.DbEmployeeInstitution", b =>
+                {
+                    b.HasOne("Domain.DbModels.DbEmployee", "Employee")
+                        .WithMany("EmployeeInstitutions")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.DbModels.DbInstitution", "Institution")
+                        .WithMany("EmployeeInstitutions")
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.DbModels.DbJobTitle", "JobTitle")
+                        .WithMany("EmployeeInstitutions")
+                        .HasForeignKey("JobTitleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Institution");
+
+                    b.Navigation("JobTitle");
+                });
+
+            modelBuilder.Entity("Domain.DbModels.DbInstitution", b =>
+                {
+                    b.HasOne("Domain.DbModels.DbEmployee", "Head")
+                        .WithMany()
+                        .HasForeignKey("HeadId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Head");
                 });
 
             modelBuilder.Entity("Domain.DbModels.DbMessage", b =>
@@ -270,22 +376,41 @@ namespace Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Client");
-                });
-
-            modelBuilder.Entity("Domain.DbModels.DbUser", b =>
-                {
                     b.HasOne("Domain.DbModels.DbInstitution", "Institution")
-                        .WithMany("Users")
-                        .HasForeignKey("InstitutionId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .WithMany()
+                        .HasForeignKey("InstitutionId");
+
+                    b.Navigation("Client");
 
                     b.Navigation("Institution");
                 });
 
+            modelBuilder.Entity("Domain.DbModels.DbUser", b =>
+                {
+                    b.HasOne("Domain.DbModels.DbEmployee", "Employee")
+                        .WithOne("User")
+                        .HasForeignKey("Domain.DbModels.DbUser", "EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("Domain.DbModels.DbEmployee", b =>
+                {
+                    b.Navigation("EmployeeInstitutions");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Domain.DbModels.DbInstitution", b =>
                 {
-                    b.Navigation("Users");
+                    b.Navigation("EmployeeInstitutions");
+                });
+
+            modelBuilder.Entity("Domain.DbModels.DbJobTitle", b =>
+                {
+                    b.Navigation("EmployeeInstitutions");
                 });
 
             modelBuilder.Entity("Domain.DbModels.DbMessage", b =>

@@ -1,5 +1,6 @@
 ﻿using API.Controllers.Abstractions;
 using Application.Dto.Users.Requests;
+using Application.Dto.UserWithEmployee.Requests;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,14 +22,27 @@ public class UserController : BaseController
     {
         return Ok(await _userService.GetMeAsync(UserId));
     }
-    
-    [HttpPost]
-    [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
-    public async Task<IActionResult> Add(CreateUserByAdminRequest request)
+
+    [HttpGet("by-employee/{employeeId}")]
+    public async Task<IActionResult> GetByEmployeeId(Guid employeeId)
     {
-        return Ok(await _userService.AddAsync(request, UserId, UserRole, InstitutionId));
+        return Ok(await _userService.GetUserByEmployeeIdAsync(employeeId));
+    }
+    
+    [HttpPost("{employeeId}")]
+    [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
+    public async Task<IActionResult> Add(Guid employeeId, CreateUserByAdminRequest request)
+    {
+        return Ok(await _userService.AddAsync(request, employeeId, UserRole, InstitutionIds));
     }
 
+    [HttpPost("with-employee")]
+    [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
+    public async Task<IActionResult> AddEmployeeWithUser(CreateUserWithEmployeeRequest request)
+    {
+        return Ok(await _userService.AddEmployeeWithUserAsync(request, UserRole, InstitutionIds));
+    }
+    
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -39,7 +53,7 @@ public class UserController : BaseController
     [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        return Ok(await _userService.GetAllUsers(page, pageSize, UserRole, InstitutionId));
+        return Ok(await _userService.GetAllUsersAsync(page, pageSize, UserRole, InstitutionIds));
     }
     
     [HttpGet("operators")]
@@ -50,9 +64,9 @@ public class UserController : BaseController
     }
     
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, CreateUserByAdminRequest request)
+    public async Task<IActionResult> Update(Guid id, CreateUserWithEmployeeRequest request)
     {
-        return Ok(await _userService.UpdateAsync(request, UserId, id, UserRole, InstitutionId));
+        return Ok(await _userService.UpdateAsync(request, UserId, id, UserRole, InstitutionIds));
     }
 
     [HttpPut("password")]
@@ -66,14 +80,14 @@ public class UserController : BaseController
     [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
     public async Task<IActionResult> ForceResetPassword(Guid id)
     {
-        return Ok(await _userService.ForceResetPasswordAsync(UserId, id, UserRole, InstitutionId));
+        return Ok(await _userService.ForceResetPasswordAsync(UserId, id, UserRole, InstitutionIds));
     }
 
     [HttpDelete("{id}")]
     [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> RevoteAccess(Guid id)
     {
-        await _userService.DeleteAsync(UserId, id, UserRole, InstitutionId);
+        await _userService.RevoteAccessAsync(UserId, id, UserRole, InstitutionIds);
         return NoContent();
     }
 }

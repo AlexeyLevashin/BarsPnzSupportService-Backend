@@ -11,7 +11,9 @@ public class DbRequest
     public Guid ClientId { get; set; }
     public RequestStatus Status { get; set; }
     public Priority Priority { get; set; }
+    public Guid? InstitutionId { get; set; }
     public DbUser Client { get; set; }
     public List<DbUser> Operators { get; set; } = new();
     public List<DbMessage> Messages { get; set; } = new();
+    public DbInstitution? Institution { get; set; }
 }

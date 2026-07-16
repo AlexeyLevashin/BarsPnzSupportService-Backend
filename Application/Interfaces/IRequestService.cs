@@ -9,7 +9,7 @@ namespace Application.Interfaces;
 
 public interface IRequestService
 {
-    public Task<CreateRequestResponse> AddAsync(CreateRequestRequest request, Guid userId);
+    public Task<CreateRequestResponse> AddAsync(CreateRequestRequest request, Guid userId, UserRole userRole, List<Guid> institutionIds);
     public Task<PagedResponse<GetRequestResponse>> GetAllAsync(int pageNumber, int pageSize);
     public Task<PagedResponse<GetRequestResponse>> GetMyAsync(int pageNumber, int pageSize, Guid? userId);
     public Task<GetRequestResponse> GetRequestByIdAsync(Guid? id);

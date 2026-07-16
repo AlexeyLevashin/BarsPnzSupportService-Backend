@@ -26,15 +26,23 @@ public static class DbInitializer
 
         if (!user && email is not null && password is not null)
         {
-            var superAdmin = new DbUser
+            var employeeSuperAdmin = new DbEmployee
             {
                 Name = "string",
                 Surname = "string",
                 Patronymic = "string",
+                PhoneNumber = "string",
+                IsUser = true,
+                Email = email
+            };
+            
+            var superAdmin = new DbUser
+            {
+
                 Email = email,
                 PasswordHash = passwordHasher.Hash(password),
                 Role = UserRole.SuperAdmin,
-                InstitutionId = null
+                Employee = employeeSuperAdmin
             };
 
             await userRepository.AddAsync(superAdmin);

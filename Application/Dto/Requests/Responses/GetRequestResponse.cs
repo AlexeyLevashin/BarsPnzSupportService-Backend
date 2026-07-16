@@ -11,6 +11,7 @@ public class GetRequestResponse
     public DateTime? ClosedAt { get; set; }
     public Guid ClientId { get; set; }
     public string ClientFullName { get; set; }
+    public Guid? InstitutionId { get; set; }
     public string? InstitutionName { get; set; }
     public List<GetOperatorResponse> Operators { get; set; } = new();
     public RequestStatus Status { get; set; }

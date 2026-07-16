@@ -36,6 +36,8 @@ public static class InfrastructureExtensions
         services.AddScoped<IAttachmentRepository, AttachmentRepository>();
         services.AddScoped<IRequestNotificationService, SignalRNotifier>();
         services.AddScoped<IMinioFileStorageService, MinioFileStorageService>();
+        services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IJobTitleRepository, JobTitleRepository>();
         services.AddMappings();
         
         

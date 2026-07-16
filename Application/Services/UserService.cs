@@ -1,10 +1,16 @@
 ﻿using Application.Common.Pagination;
+using Application.Common.Validators.Interfaces;
+using Application.Dto.Employees.Requests;
 using Application.Dto.Institutions.Requests;
 using Application.Dto.Users.Requests;
 using Application.Dto.Users.Responses;
+using Application.Dto.UserWithEmployee.Requests;
 using Application.Exceptions.Abstractions;
+using Application.Exceptions.Employees;
 using Application.Exceptions.Institutions;
+using Application.Exceptions.JobTitles;
 using Application.Exceptions.Users;
+using Application.Extensions;
 using Application.Interfaces;
 using Domain.DbModels;
 using Domain.Enums;
@@ -18,15 +24,21 @@ public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
     private readonly IInstitutionRepository _institutionRepository;
+    private readonly IEmployeeRepository _employeeRepository;
+    private readonly IJobTitleRepository _jobTitleRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordService _passwordService;
+    private readonly IWorkplaceValidationService _workplaceValidationService;
 
-    public UserService(IUserRepository userRepository, IInstitutionRepository institutionRepository, IUnitOfWork unitOfWork, IPasswordService passwordService)
+    public UserService(IUserRepository userRepository, IInstitutionRepository institutionRepository, IUnitOfWork unitOfWork, IPasswordService passwordService, IEmployeeRepository employeeRepository, IJobTitleRepository jobTitleRepository, IWorkplaceValidationService workplaceValidationService)
     {
         _userRepository = userRepository;
         _institutionRepository = institutionRepository;
+        _employeeRepository = employeeRepository;
+        _jobTitleRepository = jobTitleRepository;
         _unitOfWork = unitOfWork;
         _passwordService = passwordService;
+        _workplaceValidationService = workplaceValidationService;
     }
 
     public async Task<GetUserResponse> GetMeAsync(Guid? userId)
@@ -36,7 +48,7 @@ public class UserService : IUserService
             throw new BadRequestException("ID пользователя не может быть пустым");
         }
         
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdWithDeyailsAsync(userId);
 
         if (user is null)
         {
@@ -46,12 +58,11 @@ public class UserService : IUserService
         return user.Adapt<GetUserResponse>();
     }
     
-    public async Task<CreateUserResponse> AddAsync(CreateUserByAdminRequest request, Guid userId, UserRole userRole, Guid? institutionId)
+    public async Task<CreateUserResponse> AddAsync(CreateUserByAdminRequest request, Guid employeeId, UserRole userRole, List<Guid> institutionIds)
     {
         if (userRole == UserRole.UserAdmin)
         {
             request.Role = UserRole.User;
-            request.InstitutionId = institutionId;
         }
         
         if (userRole == UserRole.Operator && request.Role == UserRole.SuperAdmin)
@@ -59,9 +70,80 @@ public class UserService : IUserService
             throw new ForbiddenException("Оператор не может добавлять суперадмина");
         }
 
-        if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && request.InstitutionId is null)
+        var employee = await _employeeRepository.GetByIdAsync(employeeId);
+        if (employee is null)
         {
-            throw new UserNotBoundToInstitutionException();
+            throw new EmployeeNotFoundException();
+        }
+        
+        if (employee.IsUser)
+        {
+            throw new ConflictException("У данного сотрудника уже есть учетная запись");
+        }
+
+        if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin)
+            && !employee.EmployeeInstitutions.Any())
+        {
+            throw new UserNotBoundToInstitutionException(
+                "Сначала добавьте сотрудника в одно из учреждений");
+        }
+        
+        if (userRole == UserRole.UserAdmin && !employee.EmployeeInstitutions.Any(ei => institutionIds.Contains(ei.InstitutionId)))
+        {
+            throw new ForeignInstitutionException();
+        }
+        
+        var user = await _userRepository.GetByEmailAsync(request.Email);
+        if (user is not null)
+        {
+            throw new UserWithEmailIsAlreadyExistException();
+        }
+        
+        if (await _employeeRepository.CheckByEmailExistsAsync(request.Email, employeeId))
+        {
+            throw new EmployeeWithEmailIsAlreadyExistException();
+        }
+        
+        var newUser = request.Adapt<DbUser>();
+        newUser.EmployeeId = employeeId;
+        var password = _passwordService.GeneratePassword();
+        newUser.PasswordHash = _passwordService.Hash(password);
+        employee.IsUser = true;
+        employee.Email = request.Email;
+        await _userRepository.AddAsync(newUser);
+        await _unitOfWork.SaveChangesAsync();
+        
+        var response = newUser.Adapt<CreateUserResponse>();
+        response.InitialPassword = password;
+        return response;
+    }
+
+    public async Task<CreateUserResponse> AddEmployeeWithUserAsync(CreateUserWithEmployeeRequest request, UserRole userRole, List<Guid> institutionIds)
+    {
+        if (userRole == UserRole.UserAdmin)
+        {
+            request.Role = UserRole.User;
+        }
+        
+        if (userRole == UserRole.Operator && request.Role == UserRole.SuperAdmin)
+        {
+            throw new ForbiddenException("Оператор не может добавлять суперадмина");
+        }
+
+        if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && !request.Workplaces.Any())
+        {
+            throw new UserNotBoundToInstitutionException(
+                "Для роли «Пользователь» или «Админ учреждения» необходимо указать хотя бы одно учреждение");
+        }
+
+        if (userRole == UserRole.UserAdmin && request.Workplaces.Any(reqInst => !institutionIds.Contains(reqInst.InstitutionId)))
+        {
+            throw new ForeignInstitutionException();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.PhoneNumber)&& await _employeeRepository.CheckByPhoneNumberExistsAsync(request.PhoneNumber))
+        {
+            throw new EmployeeWithPhoneNumberIsAlreadyExistException();
         }
         
         var user = await _userRepository.GetByEmailAsync(request.Email);
@@ -70,20 +152,18 @@ public class UserService : IUserService
         {
             throw new UserWithEmailIsAlreadyExistException();
         }
-
-        if (request.InstitutionId != null)
-        {
-            var institution = await _institutionRepository.GetByIdAsync(request.InstitutionId.Value);
-
-            if (institution is null)
-            {
-                throw new InstitutionNotFoundException();
-            }
-        }
     
+        if (await _employeeRepository.CheckByEmailExistsAsync(request.Email))
+        {
+            throw new EmployeeWithEmailIsAlreadyExistException();
+        }
+        
+        await _workplaceValidationService.ValidateAsync(request.Workplaces);
+        
         var newUser = request.Adapt<DbUser>();
         var password = _passwordService.GeneratePassword();
         newUser.PasswordHash = _passwordService.Hash(password);
+        
         await _userRepository.AddAsync(newUser);
         await _unitOfWork.SaveChangesAsync();
         
@@ -99,7 +179,7 @@ public class UserService : IUserService
             throw new BadRequestException("ID пользователя не может быть пустым");
         }
         
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdWithDeyailsAsync(userId);
 
         if (user is null)
         {
@@ -109,7 +189,24 @@ public class UserService : IUserService
         return user.Adapt<GetUserResponse>();
     }
 
-    public async Task<PagedResponse<GetUserResponse>> GetAllUsers(int pageNumber, int pageSize, UserRole userRole, Guid? institutionId)
+    public async Task<GetUserResponse> GetUserByEmployeeIdAsync(Guid employeeId)
+    {
+        if (employeeId == Guid.Empty)
+        {
+            throw new BadRequestException("ID сотрудника не может быть пустым");
+        }
+
+        var user = await _userRepository.GetByEmployeeIdAsync(employeeId);
+
+        if (user is null)
+        {
+            throw new UserNotFoundException();
+        }
+
+        return user.Adapt<GetUserResponse>();
+    }
+
+    public async Task<PagedResponse<GetUserResponse>> GetAllUsersAsync(int pageNumber, int pageSize, UserRole userRole, List<Guid> institutionIds)
     { 
         if (pageNumber < 1) pageNumber = 1;
 
@@ -117,16 +214,18 @@ public class UserService : IUserService
 
         if (pageSize > 50) pageSize = 50;
         
-        Guid? filterInstitutionId = null;
+        List<Guid>? filterInstitutionId = null;
 
         if (userRole == UserRole.UserAdmin)
         {
-            if (institutionId is null)
+            if (institutionIds == null || !institutionIds.Any())
             {
                 throw new UserNotBoundToInstitutionException();
             }
-            filterInstitutionId = institutionId;
+            
+            filterInstitutionId = institutionIds;
         }
+        
         var usersInfo = await _userRepository.GetAllAsync(pageNumber, pageSize, filterInstitutionId);
         var users = usersInfo.Users.Adapt<List<GetUserResponse>>();
         
@@ -145,7 +244,7 @@ public class UserService : IUserService
         return result;
     }
     
-    public async Task<GetUserResponse> UpdateAsync(CreateUserByAdminRequest request, Guid userId, Guid id, UserRole userRole, Guid? institutionId)
+    public async Task<GetUserResponse> UpdateAsync(CreateUserWithEmployeeRequest request, Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds)
     {
         var userToUpdate = await _userRepository.GetByIdAsync(id);
         if (userToUpdate is null)
@@ -153,22 +252,18 @@ public class UserService : IUserService
             throw new UserNotFoundException();
         }
         
+        var employee = userToUpdate.Employee;
+        
         if (userId != id && userRole == UserRole.User)
         {
             throw new ForbiddenException("Пользователь не может изменять других пользователей");
         }
         
-        if (userId != id && userRole == UserRole.UserAdmin && (userToUpdate.Role != UserRole.User || userToUpdate.InstitutionId != institutionId))
+        if (userId != id && userRole == UserRole.UserAdmin && (userToUpdate.Role != UserRole.User || !userToUpdate.Employee.EmployeeInstitutions.Any(ei => institutionIds.Contains(ei.InstitutionId))))
         {
             throw new ForbiddenException("Администратор учреждения может изменять только обычных пользователей и только в пределах своего учреждения");
         }
-
-        if (userRole == UserRole.UserAdmin || userRole == UserRole.User)
-        {
-            request.Role = (userId == id) ? userToUpdate.Role : UserRole.User;
-            request.InstitutionId = institutionId;
-        }
-
+        
         if (userId != id && userRole == UserRole.Operator && (userToUpdate.Role == UserRole.SuperAdmin || userToUpdate.Role == UserRole.Operator))
         {
             throw new ForbiddenException("У вас нет прав на изменение данного пользователя");
@@ -179,33 +274,63 @@ public class UserService : IUserService
             throw new ForbiddenException("Оператор не может выдавать такие права");
         }
 
-        if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && request.InstitutionId is null)
+        if (userRole == UserRole.UserAdmin && request.Workplaces.Any(w => !institutionIds.Contains(w.InstitutionId)))
         {
-            throw new UserNotBoundToInstitutionException();
+            throw new ForeignInstitutionException("Вы не можете привязывать сотрудников к учреждениям, к которым у вас нет доступа");
         }
 
+        if (!string.IsNullOrWhiteSpace(request.PhoneNumber)&& request.PhoneNumber != employee.PhoneNumber && await _employeeRepository.CheckByPhoneNumberExistsAsync(request.PhoneNumber, employee.Id))
+        {
+            throw new EmployeeWithPhoneNumberIsAlreadyExistException();
+        }
+        
+        if (await _employeeRepository.CheckByEmailExistsAsync(request.Email, employee.Id))
+        {
+            throw new EmployeeWithEmailIsAlreadyExistException();
+        }
+        
+        if (userRole == UserRole.User)
+        {
+            request.Workplaces = employee.EmployeeInstitutions.Select(ei => new EmployeeInstitutionRequest 
+            { 
+                InstitutionId = ei.InstitutionId, 
+                JobTitleId = ei.JobTitleId 
+            }).ToList();
+        }
+        
         var checkEmailExist = await _userRepository.GetByEmailAsync(request.Email);
         if (checkEmailExist is not null && checkEmailExist.Id != id)
         {
             throw new UserWithEmailIsAlreadyExistException();
         }
         
-        if  (request.InstitutionId != null)
+        if (userRole == UserRole.UserAdmin || userRole == UserRole.User)
         {
-            var institution = await _institutionRepository.GetByIdAsync(request.InstitutionId.Value);
-
-            if (institution is null)
-            {
-                throw new InstitutionNotFoundException();
-            }
+            request.Role = (userId == id) ? userToUpdate.Role : UserRole.User;
         }
 
-        request.Adapt(userToUpdate);
-        _userRepository.UpdateAsync(userToUpdate);
+        if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && !request.Workplaces.Any())
+        {
+            throw new UserNotBoundToInstitutionException(
+                "Нельзя удалить единственное учреждение у пользователя с ролью «Пользователь» или «Админ учреждения»");
+        }
+
+        await _workplaceValidationService.ValidateAsync(request.Workplaces);
+        
+        userToUpdate.Email = request.Email;
+        userToUpdate.Role = request.Role;
+    
+        employee.Name = request.Name;
+        employee.Surname = request.Surname;
+        employee.Patronymic = request.Patronymic;
+        employee.PhoneNumber = request.PhoneNumber;
+        employee.Email = request.Email;
+        
+        employee.EmployeeInstitutions.SyncEmployeeInstitutions(request.Workplaces);
+        
         await _unitOfWork.SaveChangesAsync();
 
-        var response = userToUpdate.Adapt<GetUserResponse>();
-        return response;
+        return userToUpdate.Adapt<GetUserResponse>();
     }
 
     public async Task UpdatePasswordAsync(UpdateUserPasswordRequest request, Guid id)
@@ -226,7 +351,7 @@ public class UserService : IUserService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task<CreateUserResponse> ForceResetPasswordAsync(Guid userId, Guid id, UserRole userRole, Guid? institutionId)
+    public async Task<CreateUserResponse> ForceResetPasswordAsync(Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds)
     {
         // todo Когда будет реализована работа с почтой, раскомментить проверку
         // if (userId == id)
@@ -239,7 +364,7 @@ public class UserService : IUserService
             throw new UserNotFoundException();
         }
 
-        if (userId != id && userRole == UserRole.UserAdmin && (userToUpdate.Role != UserRole.User || userToUpdate.InstitutionId != institutionId))
+        if (userId != id && userRole == UserRole.UserAdmin && (userToUpdate.Role != UserRole.User || !userToUpdate.Employee.EmployeeInstitutions.Any(w => institutionIds.Contains(w.InstitutionId))))
         {
             throw new ForbiddenException("У вас нет прав на изменение пароля для данного пользователя");
         }
@@ -259,7 +384,7 @@ public class UserService : IUserService
         return response;
     }
 
-    public async Task DeleteAsync(Guid userId, Guid id, UserRole userRole, Guid? institutionId)
+    public async Task RevoteAccessAsync(Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds)
     {
         if (userId == id)
         {
@@ -278,7 +403,7 @@ public class UserService : IUserService
             throw new ForbiddenException("У вас нет прав на удаление этого пользователя");
         }
 
-        if (userRole == UserRole.UserAdmin && institutionId != userToDelete.InstitutionId)
+        if (userRole == UserRole.UserAdmin && !userToDelete.Employee.EmployeeInstitutions.Any(w => institutionIds.Contains(w.InstitutionId)))
         {
             throw new ForbiddenException("Нельзя удалить пользователя не из своего учреждения");
         }
@@ -288,7 +413,14 @@ public class UserService : IUserService
             throw new ForbiddenException("У вас нет прав на удаление данного пользователя");
         }
 
-        _userRepository.DeleteAsync(userToDelete);
+        var employee = await _employeeRepository.GetByIdAsync(userToDelete.EmployeeId);
+        if (employee is null)
+        {
+            throw new EmployeeNotFoundException();
+        }
+
+        userToDelete.IsDeleted = true;
+        employee.IsUser = false;
         await _unitOfWork.SaveChangesAsync();
     }
 }

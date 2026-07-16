@@ -15,12 +15,7 @@ public abstract class BaseController : ControllerBase
 
     protected UserRole UserRole => User.GetUserRole();
     
-    protected Guid? InstitutionId
-    {
-        get
-        {
-            var claim = User.FindFirstValue("InstitutionId");
-            return claim != null ? Guid.Parse(claim) : null;
-        }
-    }
+    protected List<Guid> InstitutionIds => User.GetInstitutionIds();
+
+    protected Guid EmployeeId => User.GetEmployeeId();
 }

@@ -24,7 +24,7 @@ public class RequestController : BaseController
     [HttpPost]
     public async Task<IActionResult> Create(CreateRequestRequest request)
     {
-        return Ok(await _requestService.AddAsync(request, UserId));
+        return Ok(await _requestService.AddAsync(request, UserId, UserRole, InstitutionIds));
     }
 
     [HttpGet("all")]

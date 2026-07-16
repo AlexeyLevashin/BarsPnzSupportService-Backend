@@ -3,7 +3,7 @@ using Domain.Enums;
 
 namespace Application.Dto.Authorization.Requests;
 
-public class RegisterRequest
+public class RegisterRequest //todo добавить полей для сотрудника и поменять сам метод
 {
     [Required(ErrorMessage = "Имя обязательно для заполнения.")]
     [MinLength(1, ErrorMessage = "Имя не может быть пустым.")]

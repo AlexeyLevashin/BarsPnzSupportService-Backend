@@ -12,9 +12,11 @@ public class CreateInstitutionRequest
     [RegularExpression(@"^(\d{10}|\d{12})$", ErrorMessage = "ИНН должен состоять из 10 или 12 цифр")]
     public string INN { get; set; }
     
-    public string? HeadName { get; set; }
+    [Phone(ErrorMessage = "Неверный формат номера телефона")]
+    public string? PhoneNumber { get; set; }
+   
+    [EmailAddress(ErrorMessage = "Неверный формат email")]
+    public string? Email { get; set; }
     
-    public string? HeadSurname { get; set; }
-    
-    public string? HeadPatronymic { get; set; }
+    public Guid? HeadId { get; set; }
 }

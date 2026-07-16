@@ -16,4 +16,6 @@ public class CreateRequestRequest
     
     [Required(ErrorMessage = "Сообщение обязательно для заполнения")]
     public CreateFirstMessageRequest Message { get; set; }
+    
+    public Guid? InstitutionId { get; set; }
 }

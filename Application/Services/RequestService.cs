@@ -2,6 +2,7 @@
 using Application.Dto.Requests.Requests;
 using Application.Dto.Requests.Responses;
 using Application.Exceptions.Abstractions;
+using Application.Exceptions.Institutions;
 using Application.Exceptions.Messages;
 using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
@@ -36,8 +37,20 @@ public class RequestService : IRequestService
         _attachmentRepository = attachmentRepository;
     }
     
-    public async Task<CreateRequestResponse> AddAsync(CreateRequestRequest request, Guid userId)
+    public async Task<CreateRequestResponse> AddAsync(CreateRequestRequest request, Guid userId, UserRole userRole, List<Guid> institutionIds)
     {
+        bool isRestrictedRole = userRole == UserRole.User || userRole == UserRole.UserAdmin;
+
+        if (isRestrictedRole && request.InstitutionId == null)
+        {
+            throw new NoInstitutionSelected();
+        }
+
+        if (isRestrictedRole && !institutionIds.Contains(request.InstitutionId!.Value))
+        {
+            throw new ForbiddenException("Вы не можете создать заявку для учреждения, в котором не числитесь");
+        }
+        
         var dbRequest = request.Adapt<DbRequest>();
         var dbMessage = request.Message.Adapt<DbMessage>();
         dbRequest.Status = RequestStatus.New;
