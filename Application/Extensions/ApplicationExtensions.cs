@@ -24,6 +24,7 @@ public static class ApplicationExtensions
         services.AddScoped<IAttachmentService, AttachmentService>();
         services.AddScoped<IAutoCloseStaleRequestsJob, AutoCloseStaleRequestsJob>();
         services.AddScoped<IEmployeeService, EmployeeService>();
+        services.AddScoped<IJobTitleService, JobTitleService>();
         services.AddScoped<IWorkplaceValidationService, WorkplaceValidationService>();
         services.Configure<FileUploadOptions>(configuration.GetSection("FileUpload"));
         
