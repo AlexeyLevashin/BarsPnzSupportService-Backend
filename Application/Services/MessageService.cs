@@ -65,9 +65,14 @@ public class MessageService : IMessageService
         
         requestCheck.Status = ChangeStatusAsync(requestCheck.Status, request.Status, userRole, request.Type);
 
-        if (requestCheck.Status == RequestStatus.Canceled || requestCheck.Status == RequestStatus.Closed)
+        if ((requestCheck.Status == RequestStatus.Canceled || requestCheck.Status == RequestStatus.Closed) && request.Type == MessageType.Public)
         {
             requestCheck.ClosedAt = DateTime.UtcNow;
+        }
+
+        if (requestCheck.Status != RequestStatus.Canceled && requestCheck.Status != RequestStatus.Closed && request.Type == MessageType.Public)
+        {
+            requestCheck.ClosedAt = null;
         }
         
         await _messageRepository.CreateAsync(dbMessage);
@@ -138,11 +143,6 @@ public class MessageService : IMessageService
     
     private RequestStatus ChangeStatusAsync(RequestStatus currentStatus, RequestStatus status, UserRole userRole, MessageType type)
     {
-        if ((currentStatus == RequestStatus.Canceled || currentStatus == RequestStatus.Closed) && type == MessageType.Public)
-        {
-            throw new RequestIsClosedException();
-        }
-            
         if ((userRole == UserRole.User || userRole == UserRole.UserAdmin) && status != RequestStatus.Closed)
         {
             return currentStatus == RequestStatus.New ? RequestStatus.New : RequestStatus.InProgress;

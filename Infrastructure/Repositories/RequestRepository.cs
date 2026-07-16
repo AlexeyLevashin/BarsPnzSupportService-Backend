@@ -4,6 +4,7 @@ using Domain.Enums;
 using Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Internal;
+using Microsoft.VisualBasic.CompilerServices;
 using Persistence;
 
 namespace Infrastructure.Repositories;
@@ -26,8 +27,15 @@ public class RequestRepository : IRequestRepository
     {
         return await _context.Requests
             .IgnoreQueryFilters()
-            .Include(c => c.Client)
-                .ThenInclude(i => i.Institution)
+            .Include(r => r.Client)
+                .ThenInclude(u => u.Employee)
+                    .ThenInclude(e => e.EmployeeInstitutions)
+                        .ThenInclude(ei => ei.Institution)
+
+            .Include(r => r.Client)
+                .ThenInclude(u => u.Employee)
+                    .ThenInclude(e => e.EmployeeInstitutions)
+                        .ThenInclude(ei => ei.JobTitle)
             .Include(o => o.Operators)
             .FirstOrDefaultAsync(r => r.Id == id);
     }
@@ -44,9 +52,20 @@ public class RequestRepository : IRequestRepository
         IQueryable<DbRequest> query = _context.Requests
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Include(c => c.Client)
-                .ThenInclude(i => i.Institution)
-            .Include(o => o.Operators);
+            .Include(r => r.Client)
+                .ThenInclude(u => u.Employee)
+                    .ThenInclude(e => e.EmployeeInstitutions)
+                        .ThenInclude(ei => ei.Institution)
+
+            .Include(r => r.Client)
+                .ThenInclude(u => u.Employee)
+                    .ThenInclude(e => e.EmployeeInstitutions)
+                        .ThenInclude(ei => ei.JobTitle)
+            
+            .Include(i => i.Institution)
+            
+            .Include(o => o.Operators)
+                .ThenInclude(e => e.Employee);
         
         if (userId.HasValue)
         {
@@ -69,7 +88,7 @@ public class RequestRepository : IRequestRepository
          return await _context.Requests
             .AnyAsync(r => r.Id == requestId && r.Operators.Any(o => o.Id == operatorId));
     }
-
+    
     public async Task<List<DbRequest>> GetStaleRequestsAsync(DateTime deadline)
     {
         return await _context.Requests

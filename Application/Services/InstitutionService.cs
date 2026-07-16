@@ -25,24 +25,19 @@ public class InstitutionService : IInstitutionService
         _userRepository = userRepository;
     }
 
-    public async Task<GetInstitutionResponse> GetMy(Guid? institutionsId)
+    public async Task<List<GetInstitutionResponse>> GetMy(Guid employeeId)
     {
-        if (institutionsId is null)
-        {
-            throw new UserNotBoundToInstitutionException();
-        }
-        
-        var institution = await _institutionRepository.GetByIdAsync(institutionsId.Value);
+        var institution = await _institutionRepository.GetAllByEmployeeIdAsync(employeeId);
 
-        if (institution is null)
+        if (institution.Count == 0)
         {
             throw new InstitutionNotFoundException();
         }
         
-        return institution.Adapt<GetInstitutionResponse>();
+        return institution.Adapt<List<GetInstitutionResponse>>();
     }
 
-    public async Task<GetInstitutionResponse> AddAsync(CreateInstitutionRequest request)
+    public async Task<CreateInstitutionResponse> AddAsync(CreateInstitutionRequest request)
     {
         var institution = await _institutionRepository.GetByInnAsync(request.INN);
         if (institution is not null)
@@ -54,7 +49,7 @@ public class InstitutionService : IInstitutionService
         await _institutionRepository.AddAsync(newInstitution);
         await _unitOfWork.SaveChangesAsync();
 
-        return newInstitution.Adapt<GetInstitutionResponse>();
+        return newInstitution.Adapt<CreateInstitutionResponse>();
     }
 
     public async Task<GetInstitutionResponse> GetByIdAsync(Guid? institutionsId)

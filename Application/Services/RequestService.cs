@@ -2,6 +2,7 @@
 using Application.Dto.Requests.Requests;
 using Application.Dto.Requests.Responses;
 using Application.Exceptions.Abstractions;
+using Application.Exceptions.Institutions;
 using Application.Exceptions.Messages;
 using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
@@ -36,8 +37,20 @@ public class RequestService : IRequestService
         _attachmentRepository = attachmentRepository;
     }
     
-    public async Task<CreateRequestResponse> AddAsync(CreateRequestRequest request, Guid userId)
+    public async Task<CreateRequestResponse> AddAsync(CreateRequestRequest request, Guid userId, UserRole userRole, List<Guid> institutionIds)
     {
+        bool isRestrictedRole = userRole == UserRole.User || userRole == UserRole.UserAdmin;
+
+        if (isRestrictedRole && request.InstitutionId == null)
+        {
+            throw new NoInstitutionSelected();
+        }
+
+        if (isRestrictedRole && !institutionIds.Contains(request.InstitutionId!.Value))
+        {
+            throw new ForbiddenException("Вы не можете создать заявку для учреждения, в котором не числитесь");
+        }
+        
         var dbRequest = request.Adapt<DbRequest>();
         var dbMessage = request.Message.Adapt<DbMessage>();
         dbRequest.Status = RequestStatus.New;
@@ -167,7 +180,43 @@ public class RequestService : IRequestService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task TerminateAsync(Guid requestId, UpdateStatusRequest request, Guid userId, UserRole userRole)
+    public async Task DeleteOperatorAsync(Guid requestId, Guid operatorId)
+    {
+        if (Guid.Empty == requestId)
+        {
+            throw new BadRequestException("ID заявки не может быть пустым");
+        }
+
+        var request = await _requestRepository.GetByIdForAssignmentAsync(requestId);
+
+        if (request is null)
+        {
+            throw new RequestNotFoundException();
+        }
+
+        if (request.Status == RequestStatus.Closed || request.Status == RequestStatus.Canceled)
+        {
+            throw new ConflictException("Нельзя удалить оператора с выполненной заявки");
+        }
+        
+        var dbOperator = request.Operators.FirstOrDefault(op => op.Id == operatorId);
+
+        if (dbOperator is null)
+        {
+            throw new OperatorIsNotAssignedException(); 
+        }
+        
+        request.Operators.Remove(dbOperator);
+        
+        if (request.Operators.Count == 0 && request.Status != RequestStatus.New)
+        {
+            request.Status = RequestStatus.New;
+        }
+        
+        await _unitOfWork.SaveChangesAsync();
+    }
+    
+    public async Task ChangeStatusAsync(Guid requestId, UpdateStatusRequest request, Guid userId, UserRole userRole)
     {
         var requestCheck = await _requestRepository.GetByIdAsync(requestId);
 
@@ -176,7 +225,7 @@ public class RequestService : IRequestService
             throw new RequestNotFoundException();
         }
 
-        if (request.Status != RequestStatus.Canceled && request.Status != RequestStatus.Closed)
+        if (request.Status != RequestStatus.Canceled && request.Status != RequestStatus.Closed && request.Status != RequestStatus.InProgress)
         {
             throw new UnacceptableStatusException();
         }
@@ -200,7 +249,16 @@ public class RequestService : IRequestService
         }
         
         requestCheck.Status = request.Status;
-        requestCheck.ClosedAt = DateTime.UtcNow;
+        if (requestCheck.Status == RequestStatus.Canceled || requestCheck.Status == RequestStatus.Closed)
+        {
+            requestCheck.ClosedAt = DateTime.UtcNow;
+        }
+
+        if (requestCheck.Status != RequestStatus.Canceled && requestCheck.Status != RequestStatus.Closed)
+        {
+            requestCheck.ClosedAt = null;
+        }
+        
         await _unitOfWork.SaveChangesAsync();
     }
 }

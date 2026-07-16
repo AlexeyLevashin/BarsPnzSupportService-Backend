@@ -29,12 +29,16 @@ public class JwtProvider : IJwtProvider
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role.ToString())
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim("employeeId", user.Employee.Id.ToString())
         };
         
-        if (user.InstitutionId.HasValue)
+        if (user.Employee?.EmployeeInstitutions != null && user.Employee.EmployeeInstitutions.Any())
         {
-            claims.Add(new Claim("InstitutionId", user.InstitutionId.Value.ToString()));
+            foreach (var ei in user.Employee.EmployeeInstitutions)
+            {
+                claims.Add(new Claim("InstitutionId", ei.InstitutionId.ToString()));
+            }
         }
         
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey));

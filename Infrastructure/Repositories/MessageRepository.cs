@@ -33,6 +33,7 @@ public class MessageRepository : IMessageRepository
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(m => m.Sender)
+                .ThenInclude(e => e.Employee)
             .Where(m => m.RequestId == requestId)
             .Where(m => m.Type == type);
             

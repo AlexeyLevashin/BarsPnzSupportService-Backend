@@ -2,7 +2,7 @@
 
 namespace Application.Dto.Requests.Requests;
 
-public class AssignOperatorRequest
+public class OperatorRequest
 {
     [Required]
     public Guid OperatorId { get; set; }

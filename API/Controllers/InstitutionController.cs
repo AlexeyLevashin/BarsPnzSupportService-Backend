@@ -19,7 +19,7 @@ public class InstitutionController : BaseController
     [HttpGet("my")]
     public async Task<IActionResult> GetMy()
     {
-        return Ok(await _institutionService.GetMy(InstitutionId));
+        return Ok(await _institutionService.GetMy(EmployeeId));
     }
     
     [HttpPost]
