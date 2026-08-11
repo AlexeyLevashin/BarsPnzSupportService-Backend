@@ -10,6 +10,7 @@ using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
 using Application.Interfaces;
 using Application.Interfaces.Authentication;
+using Application.Interfaces.Repositories;
 using Domain.DbModels;
 using Domain.Enums;
 using Domain.Interfaces;

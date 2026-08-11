@@ -2,6 +2,7 @@
 using Application.Common.Minio;
 using Application.Common.Validators;
 using Application.Common.Validators.Interfaces;
+using Application.EmailTemplates;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
 using Application.Services;
@@ -26,8 +27,8 @@ public static class ApplicationExtensions
         services.AddScoped<IEmployeeService, EmployeeService>();
         services.AddScoped<IJobTitleService, JobTitleService>();
         services.AddScoped<IWorkplaceValidationService, WorkplaceValidationService>();
+        services.AddScoped<IEmailTemplateBuilder, EmailTemplateBuilder>();
         services.Configure<FileUploadOptions>(configuration.GetSection("FileUpload"));
-        
         var config = TypeAdapterConfig.GlobalSettings;
         config.Scan(Assembly.GetExecutingAssembly()); 
         

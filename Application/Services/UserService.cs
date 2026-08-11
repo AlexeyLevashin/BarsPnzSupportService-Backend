@@ -1,5 +1,6 @@
 ﻿using Application.Common.Pagination;
 using Application.Common.Validators.Interfaces;
+using Application.Dto.EmailMessages.Requests;
 using Application.Dto.Employees.Requests;
 using Application.Dto.Institutions.Requests;
 using Application.Dto.Users.Requests;
@@ -12,9 +13,11 @@ using Application.Exceptions.JobTitles;
 using Application.Exceptions.Users;
 using Application.Extensions;
 using Application.Interfaces;
+using Application.Interfaces.Repositories;
 using Domain.DbModels;
 using Domain.Enums;
 using Domain.Interfaces;
+using Hangfire;
 using Mapster;
 using StackExchange.Redis;
 
@@ -29,8 +32,10 @@ public class UserService : IUserService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordService _passwordService;
     private readonly IWorkplaceValidationService _workplaceValidationService;
+    private readonly IEmailService _emailService;
+    private readonly IEmailTemplateBuilder _emailTemplateBuilder;
 
-    public UserService(IUserRepository userRepository, IInstitutionRepository institutionRepository, IUnitOfWork unitOfWork, IPasswordService passwordService, IEmployeeRepository employeeRepository, IJobTitleRepository jobTitleRepository, IWorkplaceValidationService workplaceValidationService)
+    public UserService(IUserRepository userRepository, IInstitutionRepository institutionRepository, IUnitOfWork unitOfWork, IPasswordService passwordService, IEmployeeRepository employeeRepository, IJobTitleRepository jobTitleRepository, IWorkplaceValidationService workplaceValidationService, IEmailService emailService, IEmailTemplateBuilder emailTemplateBuilder)
     {
         _userRepository = userRepository;
         _institutionRepository = institutionRepository;
@@ -39,6 +44,8 @@ public class UserService : IUserService
         _unitOfWork = unitOfWork;
         _passwordService = passwordService;
         _workplaceValidationService = workplaceValidationService;
+        _emailService = emailService;
+        _emailTemplateBuilder = emailTemplateBuilder;
     }
 
     public async Task<GetUserResponse> GetMeAsync(Guid? userId)
@@ -76,9 +83,18 @@ public class UserService : IUserService
             throw new EmployeeNotFoundException();
         }
         
+        // Активная учётка
         if (employee.IsUser)
         {
             throw new ConflictException("У данного сотрудника уже есть учетная запись");
+        }
+
+        // Soft-deleted учётка — нельзя создавать вторую, только восстанавливать
+        var deletedUser = await _userRepository.GetByEmployeeIdIncludingDeletedAsync(employeeId);
+        if (deletedUser is not null)
+        {
+            throw new ConflictException(
+                "У данного сотрудника уже есть учетная запись. Используйте метод восстановления учетной записи");
         }
 
         if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin)
@@ -92,9 +108,8 @@ public class UserService : IUserService
         {
             throw new ForeignInstitutionException();
         }
-        
-        var user = await _userRepository.GetByEmailAsync(request.Email);
-        if (user is not null)
+
+        if (await _userRepository.IsEmailTakenAsync(request.Email))
         {
             throw new UserWithEmailIsAlreadyExistException();
         }
@@ -115,6 +130,17 @@ public class UserService : IUserService
         
         var response = newUser.Adapt<CreateUserResponse>();
         response.InitialPassword = password;
+
+        var emailContent = _emailTemplateBuilder.BuildNewUserCredentials(newUser.Email, password);
+
+        var email = new EmailMessageRequest
+        {
+            ToEmail = newUser.Email,
+            Subject = emailContent.Subject,
+            Message = emailContent.Html
+        };
+
+        BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(email));
         return response;
     }
 
@@ -169,6 +195,16 @@ public class UserService : IUserService
         
         var response = newUser.Adapt<CreateUserResponse>();
         response.InitialPassword = password;
+        var emailContent = _emailTemplateBuilder.BuildNewUserCredentials(newUser.Email, password);
+
+        var email = new EmailMessageRequest
+        {
+            ToEmail = newUser.Email,
+            Subject = emailContent.Subject,
+            Message = emailContent.Html
+        };
+
+        BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(email));
         return response;
     }
 
@@ -381,6 +417,17 @@ public class UserService : IUserService
 
         var response = userToUpdate.Adapt<CreateUserResponse>();
         response.InitialPassword = newPassword;
+
+        var emailContent = _emailTemplateBuilder.BuildNewUserCredentials(userToUpdate.Email, newPassword);
+
+        var email = new EmailMessageRequest
+        {
+            Message = emailContent.Html,
+            Subject = emailContent.Subject,
+            ToEmail = userToUpdate.Email
+        };
+
+        BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(email));
         return response;
     }
 
@@ -421,6 +468,46 @@ public class UserService : IUserService
 
         userToDelete.IsDeleted = true;
         employee.IsUser = false;
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task RestoreAccessAsync(Guid currentUserId, Guid employeeId, UserRole userRole, List<Guid> institutionIds)
+    {
+        var employee = await _employeeRepository.GetByIdAsync(employeeId);
+        if (employee is null)
+        {
+            throw new EmployeeNotFoundException();
+        }
+
+        if (employee.IsUser)
+        {
+            throw new ConflictException("Учетная запись сотрудника уже активна");
+        }
+
+        var user = await _userRepository.GetByEmployeeIdIncludingDeletedAsync(employeeId);
+        if (user is null || !user.IsDeleted)
+        {
+            throw new UserNotFoundException("Отозванная учетная запись для данного сотрудника не найдена");
+        }
+
+        if (userRole == UserRole.UserAdmin && user.Role != UserRole.User)
+        {
+            throw new ForbiddenException("У вас нет прав на восстановление этой учетной записи");
+        }
+
+        if (userRole == UserRole.UserAdmin && !user.Employee.EmployeeInstitutions.Any(w => institutionIds.Contains(w.InstitutionId)))
+        {
+            throw new ForbiddenException("Нельзя восстановить пользователя не из своего учреждения");
+        }
+
+        if (userRole == UserRole.Operator && (user.Role == UserRole.SuperAdmin || user.Role == UserRole.Operator))
+        {
+            throw new ForbiddenException("У вас нет прав на восстановление данной учетной записи");
+        }
+
+        user.IsDeleted = false;
+        employee.IsUser = true;
+
         await _unitOfWork.SaveChangesAsync();
     }
 }

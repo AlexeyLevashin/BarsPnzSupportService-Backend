@@ -16,16 +16,23 @@ public class RequestMappingConfig : IRegister
     {
         config.NewConfig<DbRequest, GetRequestResponse>()
             .Map(dest => dest.ClientFullName, 
-                src => $"{src.Client.Employee.Surname} {src.Client.Employee.Name} {src.Client.Employee.Patronymic}".Trim())
+                src => src.Client.Employee != null
+                    ? $"{src.Client.Employee.Surname} {src.Client.Employee.Name} {src.Client.Employee.Patronymic}".Trim()
+                    : string.Empty)
             .Map(dest => dest.InstitutionName, src => src.Institution != null ? src.Institution.Name : null)
             .Map(dest => dest.Operators, src => src.Operators);
 
         config.NewConfig<DbMessage, GetMessageResponse>()
             .Map(dest => dest.SenderFullName,
-                src => $"{src.Sender.Employee.Surname} {src.Sender.Employee.Name} {src.Sender.Employee.Patronymic}".Trim());
+                src => src.Sender.Employee != null
+                    ? $"{src.Sender.Employee.Surname} {src.Sender.Employee.Name} {src.Sender.Employee.Patronymic}".Trim()
+                    : string.Empty);
         
         config.NewConfig<DbUser, GetOperatorResponse>()
-            .Map(dest => dest.OperatorFullName, src => $"{src.Employee.Surname} {src.Employee.Name} {src.Employee.Patronymic}".Trim());
+            .Map(dest => dest.OperatorFullName,
+                src => src.Employee != null
+                    ? $"{src.Employee.Surname} {src.Employee.Name} {src.Employee.Patronymic}".Trim()
+                    : string.Empty);
         
         config.NewConfig<CreateEmployeeRequest, DbEmployee>()
             .Map(dest => dest.EmployeeInstitutions, src => src.Workplaces)

@@ -21,4 +21,5 @@ public interface IUserService
     public Task UpdatePasswordAsync(UpdateUserPasswordRequest request, Guid userId);
     public Task<CreateUserResponse> ForceResetPasswordAsync(Guid userId, Guid id, UserRole userRole,List<Guid> institutionIds);
     public Task RevoteAccessAsync(Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds);
+    public Task RestoreAccessAsync(Guid currentUserId, Guid employeeId, UserRole userRole, List<Guid> institutionIds);
 }

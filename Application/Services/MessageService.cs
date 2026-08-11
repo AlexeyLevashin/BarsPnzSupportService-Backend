@@ -9,6 +9,7 @@ using Application.Interfaces.Hubs;
 using Domain.DbModels;
 using Domain.Enums;
 using Domain.Interfaces;
+using Hangfire;
 using Mapster;
 
 namespace Application.Services;
@@ -62,7 +63,8 @@ public class MessageService : IMessageService
             if(!checkUserAssignToRequest && request.Type == MessageType.Public)
                 throw new NoOperatorAssignedToRequest();
         }
-        
+
+        var oldStatus = requestCheck.Status;
         requestCheck.Status = ChangeStatusAsync(requestCheck.Status, request.Status, userRole, request.Type);
 
         if ((requestCheck.Status == RequestStatus.Canceled || requestCheck.Status == RequestStatus.Closed) && request.Type == MessageType.Public)
@@ -88,6 +90,13 @@ public class MessageService : IMessageService
         var response = fullMessage.Adapt<GetMessageResponse>();
 
         await _notificationService.NotifyNewMessageAsync(requestId, response);
+
+        if (senderId != requestCheck.ClientId && oldStatus != requestCheck.Status)
+        {
+            BackgroundJob.Schedule<IRequestService>(
+                x => x.CheckAndSendEmailAsync(requestId, requestCheck.ClientId, DateTime.UtcNow),
+                TimeSpan.FromMinutes(10));
+        }
         
         return response;
     }
@@ -156,6 +165,11 @@ public class MessageService : IMessageService
         if (status == RequestStatus.New)
         {
             return currentStatus;
+        }
+
+        if (currentStatus != status)
+        {
+            
         }
         
         return status;

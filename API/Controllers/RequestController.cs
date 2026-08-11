@@ -31,7 +31,7 @@ public class RequestController : BaseController
     [Authorize(Roles = "SuperAdmin, Operator")]
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        return Ok(await _requestService.GetAllAsync(page, pageSize));
+        return Ok(await _requestService.GetAllAsync(page, pageSize, UserId));
     }
 
     [HttpGet("all/my")]
@@ -85,6 +85,13 @@ public class RequestController : BaseController
     public async Task<IActionResult> ChangeStatus(Guid requestId, UpdateStatusRequest request)
     {
         await _requestService.ChangeStatusAsync(requestId, request, UserId, UserRole);
+        return Ok();
+    }
+
+    [HttpPost("{requestId}/view")]
+    public async Task<IActionResult> MarkAsViewed(Guid requestId)
+    {
+        await _requestService.MarkAsViewedAsync(requestId, UserId);
         return Ok();
     }
 }

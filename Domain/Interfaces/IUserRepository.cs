@@ -10,8 +10,9 @@ public interface IUserRepository
     public Task<DbUser?> GetByIdAsync(Guid? userId);
     public Task<DbUser?> GetByIdWithDeyailsAsync(Guid? userId);
     public Task<DbUser?> GetByEmployeeIdAsync(Guid employeeId);
+    public Task<DbUser?> GetByEmployeeIdIncludingDeletedAsync(Guid employeeId);
     public Task<DbUser?> GetByEmailAsync(string email);
-    public Task<bool> IsEmailTakenAsync(string email);
+    public Task<bool> IsEmailTakenAsync(string email, Guid? excludeUserId = null);
     public Task<(List<DbUser> Users, int totalCount)> GetAllAsync(int pageNumber, int pageSize, List<Guid>? institutionIds);
     public Task<List<DbUser>> GetByRolesAsync(List<UserRole> roles);
     public Task<bool> HasAdminAsync();

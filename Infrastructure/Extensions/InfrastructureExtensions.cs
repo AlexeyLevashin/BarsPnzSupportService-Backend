@@ -38,8 +38,9 @@ public static class InfrastructureExtensions
         services.AddScoped<IMinioFileStorageService, MinioFileStorageService>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IJobTitleRepository, JobTitleRepository>();
+        services.AddScoped<IEmailService, EmailService>();
         services.AddMappings();
-        
+        services.Configure<SmtpOptions>(configuration.GetSection("SmtpSettings"));
         
         return services;
     }

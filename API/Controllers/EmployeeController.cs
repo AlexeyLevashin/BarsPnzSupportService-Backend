@@ -1,8 +1,6 @@
 ﻿using API.Controllers.Abstractions;
 using Application.Dto.Employees.Requests;
-using Application.Dto.UserWithEmployee.Requests;
-using Application.Interfaces.Repositories;
-using Application.Services;
+using Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

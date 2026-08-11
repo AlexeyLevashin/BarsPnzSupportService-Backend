@@ -16,4 +16,5 @@ public class GetRequestResponse
     public List<GetOperatorResponse> Operators { get; set; } = new();
     public RequestStatus Status { get; set; }
     public Priority Priority { get; set; }
+    public bool IsUnread { get; set; }
 }

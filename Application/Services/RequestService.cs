@@ -1,4 +1,5 @@
 ﻿using Application.Common.Pagination;
+using Application.Dto.EmailMessages.Requests;
 using Application.Dto.Requests.Requests;
 using Application.Dto.Requests.Responses;
 using Application.Exceptions.Abstractions;
@@ -8,9 +9,11 @@ using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
 using Application.Interfaces;
 using Application.Interfaces.Hubs;
+using Application.Interfaces.Repositories;
 using Domain.DbModels;
 using Domain.Enums;
 using Domain.Interfaces;
+using Hangfire;
 using Mapster;
 using Microsoft.AspNetCore.SignalR;
 
@@ -24,10 +27,11 @@ public class RequestService : IRequestService
     private readonly IUserRepository _userRepository;
     private readonly IRequestNotificationService _notificationService;
     private readonly IAttachmentRepository _attachmentRepository;
+    private readonly IEmailTemplateBuilder _emailTemplateBuilder;
 
     public RequestService(IRequestRepository requestRepository, IMessageRepository messageRepository,
         IUnitOfWork unitOfWork, IUserRepository userRepository, IRequestNotificationService notificationService,
-        IAttachmentRepository attachmentRepository)
+        IAttachmentRepository attachmentRepository, IEmailTemplateBuilder emailTemplateBuilder)
     {
         _requestRepository = requestRepository;
         _messageRepository = messageRepository;
@@ -35,6 +39,7 @@ public class RequestService : IRequestService
         _userRepository = userRepository;
         _notificationService = notificationService;
         _attachmentRepository = attachmentRepository;
+        _emailTemplateBuilder = emailTemplateBuilder;
     }
     
     public async Task<CreateRequestResponse> AddAsync(CreateRequestRequest request, Guid userId, UserRole userRole, List<Guid> institutionIds)
@@ -82,7 +87,7 @@ public class RequestService : IRequestService
         };
     }
 
-    public async Task<PagedResponse<GetRequestResponse>> GetAllAsync(int pageNumber, int pageSize)
+    public async Task<PagedResponse<GetRequestResponse>> GetAllAsync(int pageNumber, int pageSize, Guid userId)
     {
         if (pageNumber < 1) pageNumber = 1;
 
@@ -92,6 +97,7 @@ public class RequestService : IRequestService
 
         var requestsInfo = await  _requestRepository.GetAllAsync(pageNumber, pageSize);
         var requests = requestsInfo.Requests.Adapt<List<GetRequestResponse>>();
+        await FillUnreadFlagsAsync(requests, userId);
 
         return new PagedResponse<GetRequestResponse>
         {
@@ -114,12 +120,30 @@ public class RequestService : IRequestService
         }
         var requestsInfo = await _requestRepository.GetAllAsync(pageNumber, pageSize, userId);
         var requests = requestsInfo.Requests.Adapt<List<GetRequestResponse>>();
+        await FillUnreadFlagsAsync(requests, userId.Value);
 
         return new PagedResponse<GetRequestResponse>
         {
             Items = requests,
             PageInfo = new PageViewModel(pageNumber, requestsInfo.totalCount, pageSize)
         };
+    }
+
+    private async Task FillUnreadFlagsAsync(List<GetRequestResponse> requests, Guid userId)
+    {
+        if (!requests.Any())
+        {
+            return;
+        }
+
+        var unreadFlags = await _requestRepository.GetUnreadFlagsAsync(
+            requests.Select(r => r.Id).ToList(),
+            userId);
+
+        foreach (var request in requests)
+        {
+            request.IsUnread = unreadFlags.GetValueOrDefault(request.Id);
+        }
     }
 
     public async Task<GetRequestResponse> GetRequestByIdAsync(Guid? id)
@@ -247,8 +271,10 @@ public class RequestService : IRequestService
         {
             throw new ForbiddenException("Пользователям с данной ролью доступно только закрытие заявки");
         }
-        
+
+        var oldStatus = requestCheck.Status;
         requestCheck.Status = request.Status;
+        
         if (requestCheck.Status == RequestStatus.Canceled || requestCheck.Status == RequestStatus.Closed)
         {
             requestCheck.ClosedAt = DateTime.UtcNow;
@@ -260,5 +286,55 @@ public class RequestService : IRequestService
         }
         
         await _unitOfWork.SaveChangesAsync();
+
+        if (userId != requestCheck.ClientId && oldStatus != requestCheck.Status)
+        {
+            BackgroundJob.Schedule<IRequestService>(
+                x => x.CheckAndSendEmailAsync(requestId, requestCheck.ClientId, DateTime.UtcNow),
+                TimeSpan.FromMinutes(10));
+        }
+    }
+
+    public async Task MarkAsViewedAsync(Guid requestId, Guid userId)
+    {
+        var request = await _requestRepository.GetByIdForAssignmentAsync(requestId);
+        if (request is null)
+        {
+            throw new RequestNotFoundException();
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null)
+        {
+            throw new UserNotFoundException();
+        }
+
+        await _requestRepository.UpsertViewAsync(requestId, userId, DateTime.UtcNow);
+    }
+
+    public async Task CheckAndSendEmailAsync(Guid requestId, Guid userId, DateTime eventTime)
+    {
+        var request = await _requestRepository.GetByIdAsync(requestId);
+        if (request is null)
+        {
+            throw new RequestNotFoundException();
+        }
+        
+        var view = await _requestRepository.GetViewAsync(requestId, userId);
+    
+        if (view is null || view.LastViewedAt < eventTime)
+        {
+            var emailContent = _emailTemplateBuilder.BuildNewRequestStatus(request.Theme);
+    
+            var email = new EmailMessageRequest
+            {
+                Message = emailContent.Html,
+                Subject = emailContent.Subject,
+                ToEmail = request.Client.Email,
+                ThreadRequestId = requestId
+            };
+    
+            BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(email));
+        }
     }
 }

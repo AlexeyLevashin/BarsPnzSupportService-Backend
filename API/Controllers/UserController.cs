@@ -83,6 +83,14 @@ public class UserController : BaseController
         return Ok(await _userService.ForceResetPasswordAsync(UserId, id, UserRole, InstitutionIds));
     }
 
+    [HttpPut("{employeeId}/restore-access")]
+    [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
+    public async Task<IActionResult> RestoreAccess(Guid employeeId)
+    {
+        await _userService.RestoreAccessAsync(UserId, employeeId, UserRole, InstitutionIds);
+        return NoContent();
+    }
+
     [HttpDelete("{id}")]
     [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
     public async Task<IActionResult> RevoteAccess(Guid id)
