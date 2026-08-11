@@ -3,7 +3,7 @@ using Application.Dto.Employees.Requests;
 using Application.Dto.Employees.Responses;
 using Domain.Enums;
 
-namespace Application.Interfaces.Repositories;
+namespace Application.Interfaces;
 
 public interface IEmployeeService
 {

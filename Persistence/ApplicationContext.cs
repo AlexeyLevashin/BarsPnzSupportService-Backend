@@ -17,6 +17,7 @@ public class ApplicationContext : DbContext
     public DbSet<DbEmployee> Employees { get; set; }
     public DbSet<DbJobTitle> JobTitles { get; set; }
     public DbSet<DbEmployeeInstitution> EmployeeInstitutions { get; set; }
+    public DbSet<DbRequestView> RequestViews { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -113,6 +114,21 @@ public class ApplicationContext : DbContext
         modelBuilder.Entity<DbAttachment>(entity =>
         {
             entity.HasIndex(a => a.StorageKey).IsUnique();
+        });
+        
+        modelBuilder.Entity<DbRequestView>(entity =>
+        {
+            entity.HasKey(rv => new { rv.RequestId, rv.UserId });
+
+            entity.HasOne(rv => rv.Request)
+                .WithMany()
+                .HasForeignKey(rv => rv.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(rv => rv.User)
+                .WithMany()
+                .HasForeignKey(rv => rv.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

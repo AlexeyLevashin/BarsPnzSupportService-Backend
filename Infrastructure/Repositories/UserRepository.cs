@@ -57,6 +57,15 @@ public class UserRepository : IUserRepository
             .FirstOrDefaultAsync(u => u.EmployeeId == employeeId);
     }
 
+    public async Task<DbUser?> GetByEmployeeIdIncludingDeletedAsync(Guid employeeId)
+    {
+        return await _context.Users
+            .IgnoreQueryFilters()
+            .Include(u => u.Employee)
+                .ThenInclude(e => e.EmployeeInstitutions)
+            .FirstOrDefaultAsync(u => u.EmployeeId == employeeId);
+    }
+
     public async Task<DbUser?> GetByEmailAsync(string email)
     {
         return await _context.Users
@@ -65,9 +74,16 @@ public class UserRepository : IUserRepository
             .FirstOrDefaultAsync(u => u.Email == email);
     }
 
-    public async Task<bool> IsEmailTakenAsync(string email)
+    public async Task<bool> IsEmailTakenAsync(string email, Guid? excludeUserId = null)
     {
-        return await _context.Users.IgnoreQueryFilters().AnyAsync(u => u.Email == email);
+        var query = _context.Users.IgnoreQueryFilters().Where(u => u.Email == email);
+
+        if (excludeUserId.HasValue)
+        {
+            query = query.Where(u => u.Id != excludeUserId.Value);
+        }
+
+        return await query.AnyAsync();
     }
     
     public async Task<(List<DbUser> Users, int totalCount)> GetAllAsync(int pageNumber, int pageSize, List<Guid>? institutionIds)

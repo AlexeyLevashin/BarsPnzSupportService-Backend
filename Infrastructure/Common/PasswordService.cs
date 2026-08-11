@@ -1,4 +1,5 @@
-﻿using Domain.Interfaces;
+﻿using Application.Interfaces.Repositories;
+using Domain.Interfaces;
 
 namespace Infrastructure.Common;
 

@@ -6,7 +6,7 @@ using Application.Exceptions.Abstractions;
 using Application.Exceptions.Employees;
 using Application.Exceptions.Users;
 using Application.Extensions;
-using Application.Interfaces.Repositories;
+using Application.Interfaces;
 using Domain.DbModels;
 using Domain.Enums;
 using Domain.Interfaces;
