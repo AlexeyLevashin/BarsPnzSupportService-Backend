@@ -6,4 +6,5 @@ public interface IEmailTemplateBuilder
 {
     public EmailContent BuildNewUserCredentials(string email, string password);
     public EmailContent BuildNewRequestStatus(string theme);
+    public EmailContent BuildResetPasswordCode(string email, string code);
 }

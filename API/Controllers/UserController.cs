@@ -1,4 +1,5 @@
 ﻿using API.Controllers.Abstractions;
+using Application.Dto.PasswordResetCode.Requests;
 using Application.Dto.Users.Requests;
 using Application.Dto.UserWithEmployee.Requests;
 using Application.Interfaces;
@@ -83,6 +84,29 @@ public class UserController : BaseController
         return Ok(await _userService.ForceResetPasswordAsync(UserId, id, UserRole, InstitutionIds));
     }
 
+    [HttpPost("send-password-reset-code")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SendPasswordResetCode(PasswordResetEmailRequest request)
+    {
+        await _userService.SendPasswordResetCodeAsync(request);
+        return NoContent();
+    }
+
+    [HttpPost("verify-password-reset-code")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyPasswordResetCodeAsync(PasswordResetCodeRequest request)
+    {
+        return Ok(await _userService.VerifyPasswordResetCodeAsync(request));
+    }
+    
+    [HttpPut("complete-password-reset")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CompletePasswordReset(CompletePasswordResetRequest request)
+    {
+        await _userService.CompletePasswordResetAsync(request);
+        return NoContent();
+    }
+    
     [HttpPut("{employeeId}/restore-access")]
     [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
     public async Task<IActionResult> RestoreAccess(Guid employeeId)

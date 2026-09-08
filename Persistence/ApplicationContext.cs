@@ -18,7 +18,7 @@ public class ApplicationContext : DbContext
     public DbSet<DbJobTitle> JobTitles { get; set; }
     public DbSet<DbEmployeeInstitution> EmployeeInstitutions { get; set; }
     public DbSet<DbRequestView> RequestViews { get; set; }
-
+    public DbSet<DbPasswordResetCode> PasswordResetCodes { get; set; } 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -128,6 +128,23 @@ public class ApplicationContext : DbContext
             entity.HasOne(rv => rv.User)
                 .WithMany()
                 .HasForeignKey(rv => rv.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DbPasswordResetCode>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+
+            entity.Property(c => c.CodeHash)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.HasIndex(c => c.UserId);
+            entity.HasIndex(c => c.ResetToken);
+
+            entity.HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

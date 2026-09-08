@@ -1,5 +1,7 @@
 ﻿using Application.Common.Pagination;
 using Application.Dto.Institutions.Requests;
+using Application.Dto.PasswordResetCode.Requests;
+using Application.Dto.PasswordResetCode.Responses;
 using Application.Dto.Users.Requests;
 using Application.Dto.Users.Responses;
 using Application.Dto.UserWithEmployee.Requests;
@@ -20,6 +22,9 @@ public interface IUserService
     public Task<GetUserResponse> UpdateAsync(CreateUserWithEmployeeRequest request, Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds);
     public Task UpdatePasswordAsync(UpdateUserPasswordRequest request, Guid userId);
     public Task<CreateUserResponse> ForceResetPasswordAsync(Guid userId, Guid id, UserRole userRole,List<Guid> institutionIds);
+    public Task SendPasswordResetCodeAsync(PasswordResetEmailRequest request);
+    public Task<PasswordResetTokenResponse> VerifyPasswordResetCodeAsync(PasswordResetCodeRequest request);
+    public Task CompletePasswordResetAsync(CompletePasswordResetRequest request);
     public Task RevoteAccessAsync(Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds);
     public Task RestoreAccessAsync(Guid currentUserId, Guid employeeId, UserRole userRole, List<Guid> institutionIds);
 }

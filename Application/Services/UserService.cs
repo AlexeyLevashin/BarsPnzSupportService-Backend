@@ -1,8 +1,11 @@
-﻿using Application.Common.Pagination;
+﻿using System.Security.Cryptography;
+using Application.Common.Pagination;
 using Application.Common.Validators.Interfaces;
 using Application.Dto.EmailMessages.Requests;
 using Application.Dto.Employees.Requests;
 using Application.Dto.Institutions.Requests;
+using Application.Dto.PasswordResetCode.Requests;
+using Application.Dto.PasswordResetCode.Responses;
 using Application.Dto.Users.Requests;
 using Application.Dto.Users.Responses;
 using Application.Dto.UserWithEmployee.Requests;
@@ -34,8 +37,13 @@ public class UserService : IUserService
     private readonly IWorkplaceValidationService _workplaceValidationService;
     private readonly IEmailService _emailService;
     private readonly IEmailTemplateBuilder _emailTemplateBuilder;
+    private readonly IPasswordResetCodeRepository _passwordResetCodeRepository;
 
-    public UserService(IUserRepository userRepository, IInstitutionRepository institutionRepository, IUnitOfWork unitOfWork, IPasswordService passwordService, IEmployeeRepository employeeRepository, IJobTitleRepository jobTitleRepository, IWorkplaceValidationService workplaceValidationService, IEmailService emailService, IEmailTemplateBuilder emailTemplateBuilder)
+    public UserService(IUserRepository userRepository, IInstitutionRepository institutionRepository,
+        IUnitOfWork unitOfWork, IPasswordService passwordService, IEmployeeRepository employeeRepository,
+        IJobTitleRepository jobTitleRepository, IWorkplaceValidationService workplaceValidationService,
+        IEmailService emailService, IEmailTemplateBuilder emailTemplateBuilder,
+        IPasswordResetCodeRepository passwordResetCodeRepository)
     {
         _userRepository = userRepository;
         _institutionRepository = institutionRepository;
@@ -46,6 +54,7 @@ public class UserService : IUserService
         _workplaceValidationService = workplaceValidationService;
         _emailService = emailService;
         _emailTemplateBuilder = emailTemplateBuilder;
+        _passwordResetCodeRepository = passwordResetCodeRepository;
     }
 
     public async Task<GetUserResponse> GetMeAsync(Guid? userId)
@@ -305,7 +314,7 @@ public class UserService : IUserService
             throw new ForbiddenException("У вас нет прав на изменение данного пользователя");
         }
         
-        if (userRole == UserRole.Operator && (request.Role == UserRole.SuperAdmin || request.Role == UserRole.Operator))
+        if (userRole == UserRole.Operator && (request.Role == UserRole.SuperAdmin || request.Role == UserRole.Operator) && request.Role != userToUpdate.Role)
         {
             throw new ForbiddenException("Оператор не может выдавать такие права");
         }
@@ -389,11 +398,11 @@ public class UserService : IUserService
 
     public async Task<CreateUserResponse> ForceResetPasswordAsync(Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds)
     {
-        // todo Когда будет реализована работа с почтой, раскомментить проверку
-        // if (userId == id)
-        // {
-        //     throw new BadRequestException("Нельзя поменять пароль самому себе без подтверждения почты");
-        // }
+        if (userId == id)
+        {
+            throw new BadRequestException("Нельзя сбросить пароль самому себе");
+        }
+        
         var userToUpdate = await _userRepository.GetByIdAsync(id);
         if (userToUpdate is null)
         {
@@ -430,7 +439,95 @@ public class UserService : IUserService
         BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(email));
         return response;
     }
+    
+    public async Task SendPasswordResetCodeAsync(PasswordResetEmailRequest request)
+    {
+        var user = await _userRepository.GetByEmailAsync(request.Email);
 
+        if (user is null)
+        {
+            return;
+        }
+
+        var code = RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
+        
+        var passwordResetCodeDb = new DbPasswordResetCode
+        {
+            CodeHash = _passwordService.Hash(code),
+            ExpiresAt = DateTime.UtcNow + TimeSpan.FromMinutes(15),
+            UserId = user.Id
+        };
+
+        await _passwordResetCodeRepository.InvalidateUnusedByUserIdAsync(user.Id);
+        await _passwordResetCodeRepository.AddAsync(passwordResetCodeDb);
+        await _unitOfWork.SaveChangesAsync();
+        
+        var emailContent = _emailTemplateBuilder.BuildResetPasswordCode(user.Email, code);
+
+        var email = new EmailMessageRequest
+        {
+            Message = emailContent.Html,
+            Subject = emailContent.Subject,
+            ToEmail = user.Email
+        };
+
+        BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(email));
+    }
+
+    public async Task<PasswordResetTokenResponse> VerifyPasswordResetCodeAsync(PasswordResetCodeRequest request)
+    {
+        var user = await _userRepository.GetByEmailAsync(request.Email);
+
+        if (user is null)
+        {
+            throw new InvalidPasswordResetCodeException();
+        }
+
+        var passwordResetCode = await _passwordResetCodeRepository.GetActiveByUserIdAsync(user.Id);
+
+        if (passwordResetCode is null)
+        {
+            throw new InvalidPasswordResetCodeException();
+        }
+
+        if (!_passwordService.Verify(request.Code, passwordResetCode.CodeHash))
+        {
+            throw new InvalidPasswordResetCodeException();
+        }
+
+        var resetToken = Guid.NewGuid();
+        passwordResetCode.ResetToken = resetToken;
+        await _unitOfWork.SaveChangesAsync();
+        return new PasswordResetTokenResponse { ResetToken = resetToken };
+    }
+
+    public async Task CompletePasswordResetAsync(CompletePasswordResetRequest request)
+    {
+        if (request.ResetToken == Guid.Empty)
+        {
+            throw new InvalidPasswordResetCodeException();
+        }
+        
+        var passwordResetRequest = await _passwordResetCodeRepository.GetByResetTokenAsync(request.ResetToken);
+
+        if (passwordResetRequest is null)
+        {
+            throw new InvalidPasswordResetCodeException();
+        }
+        
+        var user = await _userRepository.GetByIdAsync(passwordResetRequest.UserId);
+        if (user is null)
+        {
+            throw new InvalidPasswordResetCodeException();
+        }
+
+        user.PasswordHash = _passwordService.Hash(request.NewPassword);
+        _userRepository.UpdateAsync(user);
+        passwordResetRequest.ResetToken = null;
+        passwordResetRequest.UsedAt = DateTime.UtcNow;
+        await _unitOfWork.SaveChangesAsync();
+    }
+    
     public async Task RevoteAccessAsync(Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds)
     {
         if (userId == id)
