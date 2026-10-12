@@ -24,6 +24,7 @@ public class EmployeeController : BaseController
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
     public async Task<IActionResult> Update(CreateEmployeeRequest request, Guid id)
     {
         return Ok(await _employeeService.UpdateAsync(id, request, UserRole, InstitutionIds));

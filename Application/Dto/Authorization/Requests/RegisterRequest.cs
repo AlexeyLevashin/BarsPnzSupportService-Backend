@@ -28,5 +28,6 @@ public class RegisterRequest //todo добавить полей для сотр�
     [Compare("Password", ErrorMessage = "Пароли не совпадают")] 
     public string ConfirmPassword { get; set; }
     
+    [Required(ErrorMessage = "Учреждение обязательно для выбора")]
     public Guid? InstitutionId { get; set; }
 }

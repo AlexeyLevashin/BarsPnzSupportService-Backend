@@ -7,6 +7,7 @@ using Application.Exceptions.Institutions;
 using Application.Exceptions.Messages;
 using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
+using Application.Extensions;
 using Application.Interfaces;
 using Application.Interfaces.Hubs;
 using Application.Interfaces.Repositories;
@@ -83,7 +84,8 @@ public class RequestService : IRequestService
         {
             Id = dbRequest.Id,
             CreatedAt = dbRequest.CreatedAt,
-            Status = dbRequest.Status
+            Status = dbRequest.Status,
+            Type = dbRequest.Type
         };
     }
 
@@ -146,7 +148,7 @@ public class RequestService : IRequestService
         }
     }
 
-    public async Task<GetRequestResponse> GetRequestByIdAsync(Guid? id)
+    public async Task<GetRequestResponse> GetRequestByIdAsync(Guid? id, Guid userId, UserRole userRole)
     {
         if (Guid.Empty == id)
         {
@@ -158,6 +160,11 @@ public class RequestService : IRequestService
         if (request is null)
         {
             throw new RequestNotFoundException();
+        }
+
+        if (!request.CanBeReadBy(userId, userRole))
+        {
+            throw new UnacceptableRequestException();
         }
 
         return request.Adapt<GetRequestResponse>();
@@ -289,18 +296,47 @@ public class RequestService : IRequestService
 
         if (userId != requestCheck.ClientId && oldStatus != requestCheck.Status)
         {
-            BackgroundJob.Schedule<IRequestService>(
-                x => x.CheckAndSendEmailAsync(requestId, requestCheck.ClientId, DateTime.UtcNow),
-                TimeSpan.FromMinutes(10));
+            if (requestCheck.Type == RequestType.Email)
+            {
+                var statusName = requestCheck.Status switch
+                {
+                    RequestStatus.InProgress => "В работе",
+                    RequestStatus.Closed => "Закрыта",
+                    RequestStatus.Canceled => "Отменена",
+                    RequestStatus.ClientDataRequest => "Запрошены данные клиента",
+                    RequestStatus.PendingReview => "Ожидает проверки",
+                    _ => "Новая"
+                };
+                var email = new EmailMessageRequest
+                {
+                    ToEmail = requestCheck.Client.Email,
+                    Subject = $"Заявка: {requestCheck.Theme}",
+                    Message = $"Статус заявки «{requestCheck.Theme}» изменён: {statusName}.",
+                    IsPlainText = true,
+                    ThreadRequestId = requestId
+                };
+                BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(email));
+            }
+            else
+            {
+                BackgroundJob.Schedule<IRequestService>(
+                    x => x.CheckAndSendEmailAsync(requestId, requestCheck.ClientId, DateTime.UtcNow),
+                    TimeSpan.FromMinutes(10));
+            }
         }
     }
 
-    public async Task MarkAsViewedAsync(Guid requestId, Guid userId)
+    public async Task MarkAsViewedAsync(Guid requestId, Guid userId, UserRole userRole)
     {
         var request = await _requestRepository.GetByIdForAssignmentAsync(requestId);
         if (request is null)
         {
             throw new RequestNotFoundException();
+        }
+
+        if (!request.CanBeReadBy(userId, userRole))
+        {
+            throw new UnacceptableRequestException();
         }
 
         var user = await _userRepository.GetByIdAsync(userId);

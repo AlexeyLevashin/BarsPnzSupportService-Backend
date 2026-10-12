@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddCustomControllers();
 builder.Services.AddSwaggerConfiguration();
 builder.Services.AddHangfireConfiguration(builder.Configuration);
+builder.Services.AddRateLimiterConfiguration();
 
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -37,6 +38,7 @@ app.UseMiddleware<ExceptionHandlingMiddlewares>();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.UseHangfireDashboard();
 

@@ -121,6 +121,7 @@ public class UserService : IUserService
         
         var newUser = request.Adapt<DbUser>();
         newUser.EmployeeId = employeeId;
+        newUser.IsActivated = true;
         var password = _passwordService.GeneratePassword();
         newUser.PasswordHash = _passwordService.Hash(password);
         employee.IsUser = true;
@@ -187,6 +188,7 @@ public class UserService : IUserService
         await _workplaceValidationService.ValidateAsync(request.Workplaces);
         
         var newUser = request.Adapt<DbUser>();
+        newUser.IsActivated = true;
         var password = _passwordService.GeneratePassword();
         newUser.PasswordHash = _passwordService.Hash(password);
         
@@ -305,7 +307,8 @@ public class UserService : IUserService
             throw new ForbiddenException("У вас нет прав на изменение данного пользователя");
         }
         
-        if (userRole == UserRole.Operator && (request.Role == UserRole.SuperAdmin || request.Role == UserRole.Operator))
+        if (userRole == UserRole.Operator && (request.Role == UserRole.SuperAdmin ||
+            (request.Role == UserRole.Operator && userId != id)))
         {
             throw new ForbiddenException("Оператор не может выдавать такие права");
         }
@@ -345,7 +348,11 @@ public class UserService : IUserService
             request.Role = (userId == id) ? userToUpdate.Role : UserRole.User;
         }
 
-        if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && !request.Workplaces.Any())
+        var canKeepEmailUserWithoutInstitution = userId == id && userToUpdate.Role == UserRole.User &&
+                                                 !employee.EmployeeInstitutions.Any() &&
+                                                 await _userRepository.HasEmailRequestAsync(id);
+        if ((request.Role == UserRole.User || request.Role == UserRole.UserAdmin) && !request.Workplaces.Any() &&
+            !canKeepEmailUserWithoutInstitution)
         {
             throw new UserNotBoundToInstitutionException(
                 "Нельзя удалить единственное учреждение у пользователя с ролью «Пользователь» или «Админ учреждения»");
@@ -389,15 +396,20 @@ public class UserService : IUserService
 
     public async Task<CreateUserResponse> ForceResetPasswordAsync(Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds)
     {
-        // todo Когда будет реализована работа с почтой, раскомментить проверку
-        // if (userId == id)
-        // {
-        //     throw new BadRequestException("Нельзя поменять пароль самому себе без подтверждения почты");
-        // }
+        if (userId == id)
+        {
+            throw new BadRequestException("Нельзя сбросить пароль самому себе");
+        }
+
         var userToUpdate = await _userRepository.GetByIdAsync(id);
         if (userToUpdate is null)
         {
             throw new UserNotFoundException();
+        }
+
+        if (!userToUpdate.IsActivated)
+        {
+            throw new ConflictException("Сначала активируйте учетную запись");
         }
 
         if (userId != id && userRole == UserRole.UserAdmin && (userToUpdate.Role != UserRole.User || !userToUpdate.Employee.EmployeeInstitutions.Any(w => institutionIds.Contains(w.InstitutionId))))
@@ -509,5 +521,42 @@ public class UserService : IUserService
         employee.IsUser = true;
 
         await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task ActivateAsync(Guid id, UserRole actorRole)
+    {
+        if (actorRole != UserRole.Operator && actorRole != UserRole.SuperAdmin)
+        {
+            throw new ForbiddenException("Активировать пользователя может только оператор или суперадминистратор");
+        }
+
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user is null)
+        {
+            throw new UserNotFoundException();
+        }
+
+        if (user.IsActivated)
+        {
+            throw new ConflictException("Учетная запись уже активирована");
+        }
+
+        if (user.Role != UserRole.User)
+        {
+            throw new ForbiddenException("Активировать таким способом можно только почтового пользователя");
+        }
+
+        var password = _passwordService.GeneratePassword();
+        user.PasswordHash = _passwordService.Hash(password);
+        user.IsActivated = true;
+        await _unitOfWork.SaveChangesAsync();
+
+        var content = _emailTemplateBuilder.BuildNewUserCredentials(user.Email, password);
+        BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(new EmailMessageRequest
+        {
+            ToEmail = user.Email,
+            Subject = content.Subject,
+            Message = content.Html
+        }));
     }
 }

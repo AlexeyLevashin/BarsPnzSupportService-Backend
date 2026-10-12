@@ -20,6 +20,7 @@ public static class ApplicationExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IInstitutionService, InstitutionService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<IRequestService, RequestService>();
         services.AddScoped<IMessageService, MessageService>();
         services.AddScoped<IAttachmentService, AttachmentService>();
@@ -28,6 +29,7 @@ public static class ApplicationExtensions
         services.AddScoped<IJobTitleService, JobTitleService>();
         services.AddScoped<IWorkplaceValidationService, WorkplaceValidationService>();
         services.AddScoped<IEmailTemplateBuilder, EmailTemplateBuilder>();
+        services.AddScoped<IInboundEmailService, InboundEmailService>();
         services.Configure<FileUploadOptions>(configuration.GetSection("FileUpload"));
         var config = TypeAdapterConfig.GlobalSettings;
         config.Scan(Assembly.GetExecutingAssembly()); 

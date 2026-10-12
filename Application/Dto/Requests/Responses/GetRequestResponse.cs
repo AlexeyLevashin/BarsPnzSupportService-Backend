@@ -15,6 +15,7 @@ public class GetRequestResponse
     public string? InstitutionName { get; set; }
     public List<GetOperatorResponse> Operators { get; set; } = new();
     public RequestStatus Status { get; set; }
+    public RequestType Type { get; set; }
     public Priority Priority { get; set; }
     public bool IsUnread { get; set; }
 }

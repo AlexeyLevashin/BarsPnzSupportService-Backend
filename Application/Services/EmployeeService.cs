@@ -63,10 +63,27 @@ public class EmployeeService : IEmployeeService
     
     public async Task<Guid> UpdateAsync(Guid id, CreateEmployeeRequest request, UserRole userRole, List<Guid> institutionIds)
     {
+        if (userRole != UserRole.Operator && userRole != UserRole.UserAdmin && userRole != UserRole.SuperAdmin)
+        {
+            throw new ForbiddenException("У вас нет прав на изменение сотрудников");
+        }
+
         var employeeToUpdate = await _employeeRepository.GetByIdAsync(id);
         if (employeeToUpdate is null)
         {
             throw new EmployeeNotFoundException();
+        }
+
+        var linkedUser = await _userRepository.GetByEmployeeIdIncludingDeletedAsync(id);
+        if (userRole == UserRole.UserAdmin && linkedUser is not null && linkedUser.Role != UserRole.User)
+        {
+            throw new ForbiddenException("Администратор учреждения может изменять только обычных пользователей");
+        }
+
+        if (userRole == UserRole.Operator && linkedUser is not null &&
+            (linkedUser.Role == UserRole.Operator || linkedUser.Role == UserRole.SuperAdmin))
+        {
+            throw new ForbiddenException("У вас нет прав на изменение данного сотрудника");
         }
         
         if (userRole == UserRole.UserAdmin && !request.Workplaces.Any())

@@ -10,10 +10,12 @@ namespace Infrastructure.Services;
 public class EmailService : IEmailService
 {
     private readonly SmtpOptions _options;
+    private readonly IMinioFileStorageService _storage;
     
-    public EmailService(IOptions<SmtpOptions> options)
+    public EmailService(IOptions<SmtpOptions> options, IMinioFileStorageService storage)
     {
         _options = options.Value;
+        _storage = storage;
     }
     
     public async Task SendEmailAsync(EmailMessageRequest request)
@@ -22,14 +24,24 @@ public class EmailService : IEmailService
         email.From.Add(new MailboxAddress(_options.FromName, _options.Username));
         email.To.Add(new MailboxAddress("", request.ToEmail));
         email.Subject = request.Subject;
-        email.Body = new TextPart(MimeKit.Text.TextFormat.Html)
+        email.Headers.Add("X-BarsPnz-Generated", "true");
+        var body = new BodyBuilder();
+        if (request.IsPlainText)
+            body.TextBody = request.Message;
+        else
+            body.HtmlBody = request.Message;
+
+        foreach (var attachment in request.Attachments)
         {
-            Text = request.Message
-        };
+            var content = await _storage.DownloadAsync(attachment.StorageKey, "attachments");
+            body.Attachments.Add(attachment.FileName, content,
+                ContentType.Parse(attachment.ContentType));
+        }
+        email.Body = body.ToMessageBody();
         
         if (request.ThreadRequestId is { } requestId)
         {
-            ApplyRequestThreadHeaders(email, requestId);
+            ApplyRequestThreadHeaders(email, requestId, request.ReplyToMessageId);
         }
 
         using (var client = new SmtpClient())
@@ -42,13 +54,15 @@ public class EmailService : IEmailService
         }
     }
 
-    private void ApplyRequestThreadHeaders(MimeMessage email, Guid requestId)
+    private void ApplyRequestThreadHeaders(MimeMessage email, Guid requestId, string? replyToMessageId)
     {
         var domain = GetMessageIdDomain();
         var rootId = $"request-{requestId}@{domain}";
 
         email.MessageId = $"request-{requestId}-{Guid.NewGuid():N}@{domain}";
-        email.InReplyTo = rootId;
+        email.InReplyTo = string.IsNullOrWhiteSpace(replyToMessageId) ? rootId : replyToMessageId;
+        if (!string.IsNullOrWhiteSpace(replyToMessageId))
+            email.References.Add(replyToMessageId);
         email.References.Add(rootId);
     }
 

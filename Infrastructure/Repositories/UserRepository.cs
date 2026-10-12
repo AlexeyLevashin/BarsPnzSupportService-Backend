@@ -68,15 +68,17 @@ public class UserRepository : IUserRepository
 
     public async Task<DbUser?> GetByEmailAsync(string email)
     {
+        var normalizedEmail = email.Trim().ToLower();
         return await _context.Users
             .Include(u => u.Employee)
                 .ThenInclude(e => e.EmployeeInstitutions)
-            .FirstOrDefaultAsync(u => u.Email == email);
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
     }
 
     public async Task<bool> IsEmailTakenAsync(string email, Guid? excludeUserId = null)
     {
-        var query = _context.Users.IgnoreQueryFilters().Where(u => u.Email == email);
+        var normalizedEmail = email.Trim().ToLower();
+        var query = _context.Users.IgnoreQueryFilters().Where(u => u.Email.ToLower() == normalizedEmail);
 
         if (excludeUserId.HasValue)
         {
@@ -84,6 +86,11 @@ public class UserRepository : IUserRepository
         }
 
         return await query.AnyAsync();
+    }
+
+    public Task<bool> HasEmailRequestAsync(Guid userId)
+    {
+        return _context.Requests.AnyAsync(r => r.ClientId == userId && r.Type == RequestType.Email);
     }
     
     public async Task<(List<DbUser> Users, int totalCount)> GetAllAsync(int pageNumber, int pageSize, List<Guid>? institutionIds)

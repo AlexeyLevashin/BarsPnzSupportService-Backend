@@ -22,4 +22,5 @@ public interface IUserService
     public Task<CreateUserResponse> ForceResetPasswordAsync(Guid userId, Guid id, UserRole userRole,List<Guid> institutionIds);
     public Task RevoteAccessAsync(Guid userId, Guid id, UserRole userRole, List<Guid> institutionIds);
     public Task RestoreAccessAsync(Guid currentUserId, Guid employeeId, UserRole userRole, List<Guid> institutionIds);
+    public Task ActivateAsync(Guid id, UserRole actorRole);
 }

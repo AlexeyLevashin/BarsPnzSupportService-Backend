@@ -91,6 +91,14 @@ public class UserController : BaseController
         return NoContent();
     }
 
+    [HttpPut("{id}/activate")]
+    [Authorize(Roles = "Operator, SuperAdmin")]
+    public async Task<IActionResult> Activate(Guid id)
+    {
+        await _userService.ActivateAsync(id, UserRole);
+        return NoContent();
+    }
+
     [HttpDelete("{id}")]
     [Authorize(Roles = "Operator, UserAdmin, SuperAdmin")]
     public async Task<IActionResult> RevoteAccess(Guid id)
