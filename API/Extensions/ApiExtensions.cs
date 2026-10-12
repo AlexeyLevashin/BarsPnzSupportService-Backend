@@ -1,5 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using Hangfire;
+using System.Threading.RateLimiting;
 using Hangfire.PostgreSql;
 using Microsoft.OpenApi.Models;
 using Microsoft.Extensions.Configuration;
@@ -55,6 +56,24 @@ public static class ServiceCollectionExtensions
                     Array.Empty<string>()
                 }
             });
+        });
+
+        return services;
+    }
+
+    public static IServiceCollection AddRateLimiterConfiguration(this IServiceCollection services)
+    {
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy("PasswordReset", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
         });
 
         return services;

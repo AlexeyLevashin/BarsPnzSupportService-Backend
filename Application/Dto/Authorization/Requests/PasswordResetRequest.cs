@@ -1,8 +1,8 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
-namespace Application.Dto.PasswordResetCode.Requests;
+namespace Application.Dto.Authorization.Requests;
 
-public class PasswordResetEmailRequest
+public class PasswordResetRequest
 {
     [Required(ErrorMessage = "Email не может быть пустым")]
     [EmailAddress(ErrorMessage = "Неверный формат email")]

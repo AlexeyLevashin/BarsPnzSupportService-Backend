@@ -13,6 +13,9 @@ public class CreateRequestRequest
     [Required(ErrorMessage = "Приоритет обязателен к выбору")]
     [EnumDataType(typeof(Priority), ErrorMessage = "Указан недопустимый приоритет")]
     public Priority Priority { get; set; }
+
+    [EnumDataType(typeof(RequestType), ErrorMessage = "Указан недопустимый тип заявки")]
+    public RequestType Type { get; set; } = RequestType.System;
     
     [Required(ErrorMessage = "Сообщение обязательно для заполнения")]
     public CreateFirstMessageRequest Message { get; set; }

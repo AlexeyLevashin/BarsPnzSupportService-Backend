@@ -67,8 +67,8 @@ public class RequestMappingConfig : IRegister
             });
 
         config.NewConfig<DbInstitution, GetInstitutionResponse>()
-            .Map(dest => dest.HeadName, src => src.Head!.Name)
-            .Map(dest => dest.HeadSurname, src => src.Head!.Surname)
-            .Map(dest => dest.HeadPatronymic, src => src.Head!.Patronymic);
+            .Map(dest => dest.HeadName, src => src.Head != null ? src.Head.Name : null)
+            .Map(dest => dest.HeadSurname, src => src.Head != null ? src.Head.Surname : null)
+            .Map(dest => dest.HeadPatronymic, src => src.Head != null ? src.Head.Patronymic : null);
     }
 }

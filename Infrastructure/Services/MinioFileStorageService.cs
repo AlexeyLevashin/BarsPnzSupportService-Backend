@@ -28,6 +28,16 @@ public class MinioFileStorageService : IMinioFileStorageService
                 .WithContentType(contentType));
     }
 
+    public async Task<byte[]> DownloadAsync(string objectName, string bucket)
+    {
+        using var stream = new MemoryStream();
+        await _minio.GetObjectAsync(new GetObjectArgs()
+            .WithBucket(bucket)
+            .WithObject(objectName)
+            .WithCallbackStream(source => source.CopyTo(stream)));
+        return stream.ToArray();
+    }
+
     public async Task<string> GetPresignedUrlAsync(string objectName, string bucket, string? originalFileName)
     {
         int expirySeconds = _options.PresignedUrlExpiryHours * 60 * 60;

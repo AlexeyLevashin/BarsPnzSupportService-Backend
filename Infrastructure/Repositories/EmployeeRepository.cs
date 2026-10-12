@@ -55,6 +55,14 @@ public class EmployeeRepository : IEmployeeRepository
             .Include(ei => ei.EmployeeInstitutions)
             .FirstOrDefaultAsync(e => e.Id == employeeId);
     }
+
+    public Task<DbEmployee?> GetByEmailAsync(string email)
+    {
+        var normalizedEmail = email.Trim().ToLower();
+        return _context.Employees.Include(e => e.User)
+            .Include(e => e.EmployeeInstitutions)
+            .FirstOrDefaultAsync(e => e.Email != null && e.Email.ToLower() == normalizedEmail);
+    }
     
     public async Task<(List<DbEmployee> Employees, int totalCount)> GetAllAsync(int pageNumber, int pageSize, List<Guid>? institutionIds)
     {

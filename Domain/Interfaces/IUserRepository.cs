@@ -17,4 +17,5 @@ public interface IUserRepository
     public Task<List<DbUser>> GetByRolesAsync(List<UserRole> roles);
     public Task<bool> HasAdminAsync();
     public Task<bool> CheckUserExistByInstitutionId(Guid institutionId);
+    public Task<bool> HasEmailRequestAsync(Guid userId);
 }

@@ -1,11 +1,15 @@
 ﻿using Application.Common.Pagination;
 using Application.Dto.Messages.Requests;
+using Application.Dto.EmailMessages.Requests;
 using Application.Dto.Messages.Responses;
+using Application.Exceptions.Abstractions;
 using Application.Exceptions.Messages;
 using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
+using Application.Extensions;
 using Application.Interfaces;
 using Application.Interfaces.Hubs;
+using Application.Interfaces.Repositories;
 using Domain.DbModels;
 using Domain.Enums;
 using Domain.Interfaces;
@@ -89,9 +93,29 @@ public class MessageService : IMessageService
 
         var response = fullMessage.Adapt<GetMessageResponse>();
 
+        if (requestCheck.Type == RequestType.Email && request.Type == MessageType.Public &&
+            (userRole == UserRole.Operator || userRole == UserRole.SuperAdmin))
+        {
+            var email = new EmailMessageRequest
+            {
+                ToEmail = requestCheck.Client.Email,
+                Subject = $"Заявка: {requestCheck.Theme}",
+                Message = fullMessage.Text ?? string.Empty,
+                IsPlainText = true,
+                ThreadRequestId = requestId,
+                Attachments = fullMessage.Attachments.Select(attachment => new EmailAttachmentRequest
+                {
+                    FileName = attachment.FileName,
+                    StorageKey = attachment.StorageKey,
+                    ContentType = attachment.ContentType
+                }).ToList()
+            };
+            BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(email));
+        }
+
         await _notificationService.NotifyNewMessageAsync(requestId, response);
 
-        if (senderId != requestCheck.ClientId && oldStatus != requestCheck.Status)
+        if (requestCheck.Type != RequestType.Email && senderId != requestCheck.ClientId && oldStatus != requestCheck.Status)
         {
             BackgroundJob.Schedule<IRequestService>(
                 x => x.CheckAndSendEmailAsync(requestId, requestCheck.ClientId, DateTime.UtcNow),
@@ -101,7 +125,7 @@ public class MessageService : IMessageService
         return response;
     }
 
-    public async Task<PagedResponse<GetMessageResponse>> GetAllMessagesAsync(int pageNumber, int pageSize, Guid? requestId)
+    public async Task<PagedResponse<GetMessageResponse>> GetAllMessagesAsync(int pageNumber, int pageSize, Guid? requestId, Guid userId, UserRole userRole)
     {
         if (pageNumber < 1) pageNumber = 1;
         
@@ -115,6 +139,11 @@ public class MessageService : IMessageService
             throw new RequestNotFoundException();
         }
 
+        if (!requestCheck.CanBeReadBy(userId, userRole))
+        {
+            throw new UnacceptableRequestException();
+        }
+
         var messagesInfo = await _messageRepository.GetAllAsync(pageNumber, pageSize, requestId, MessageType.Public);
         var messages = messagesInfo.Messages.Adapt<List<GetMessageResponse>>();
 
@@ -125,8 +154,13 @@ public class MessageService : IMessageService
         };
     }
     
-    public async Task<PagedResponse<GetMessageResponse>> GetAllCommentsAsync(int pageNumber, int pageSize, Guid? requestId)
+    public async Task<PagedResponse<GetMessageResponse>> GetAllCommentsAsync(int pageNumber, int pageSize, Guid? requestId, UserRole userRole)
     {
+        if (userRole != UserRole.Operator && userRole != UserRole.SuperAdmin)
+        {
+            throw new ForbiddenException("Внутренние комментарии доступны только операторам и суперадминистраторам");
+        }
+
         if (pageNumber < 1) pageNumber = 1;
         
         if (pageSize < 1) pageSize = 20;

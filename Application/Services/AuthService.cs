@@ -41,7 +41,7 @@ public class AuthService : IAuthService
     {
         var user = await _userRepository.GetByEmailAsync(request.Email);
 
-        if (user is null || !_passwordService.Verify(request.Password, user.PasswordHash))
+        if (user is null || !user.IsActivated || !_passwordService.Verify(request.Password, user.PasswordHash))
         {
             throw new FailureAuthorizationException();
         }
@@ -62,18 +62,37 @@ public class AuthService : IAuthService
             throw new UserWithEmailIsAlreadyExistException();
         }
 
-        if (request.InstitutionId != null)
+        if (request.InstitutionId is null)
         {
-            var institution = await _institutionRepository.GetByIdAsync((Guid)request.InstitutionId);
-            if (institution is null)
-            {
-                throw new InstitutionNotFoundException();
-            }
+            throw new NoInstitutionSelected();
         }
 
-        var newUser = request.Adapt<DbUser>();
-        newUser.PasswordHash = _passwordService.Hash(request.Password);
-        newUser.Role = UserRole.User; 
+        var institution = await _institutionRepository.GetByIdAsync(request.InstitutionId.Value);
+        if (institution is null)
+        {
+            throw new InstitutionNotFoundException();
+        }
+
+        var employee = new DbEmployee
+        {
+            Name = request.Name,
+            Surname = request.Surname,
+            Patronymic = request.Patronymic,
+            Email = request.Email,
+            IsUser = true,
+            EmployeeInstitutions = new List<DbEmployeeInstitution>
+            {
+                new() { InstitutionId = request.InstitutionId.Value }
+            }
+        };
+        var newUser = new DbUser
+        {
+            Email = request.Email,
+            PasswordHash = _passwordService.Hash(request.Password),
+            Role = UserRole.User,
+            IsActivated = true,
+            Employee = employee
+        };
         await _userRepository.AddAsync(newUser);
         await _unitOfWork.SaveChangesAsync();
 
@@ -101,7 +120,7 @@ public class AuthService : IAuthService
         }
 
         var user = await _userRepository.GetByIdAsync(userId);
-        if (user is null)
+        if (user is null || !user.IsActivated)
         {
             throw new UserNotFoundException();
         }

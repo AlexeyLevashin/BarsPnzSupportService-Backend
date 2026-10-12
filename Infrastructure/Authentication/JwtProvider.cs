@@ -85,6 +85,48 @@ public class JwtProvider : IJwtProvider
         return tokenHandler.WriteToken(token);
     }
 
+    public string GeneratePasswordResetToken(DbPasswordResetRequest request)
+    {
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var token = tokenHandler.CreateToken(new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, request.UserId.ToString()),
+                new Claim("RequestId", request.Id.ToString()),
+                new Claim("TokenType", "PasswordReset")
+            }),
+            Expires = request.ExpiresAt,
+            Issuer = _options.Issuer,
+            Audience = $"{_options.Audience}:password-reset",
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey)), SecurityAlgorithms.HmacSha256)
+        });
+        return tokenHandler.WriteToken(token);
+    }
+
+    public ClaimsPrincipal? ValidatePasswordResetToken(string token)
+    {
+        var parameters = _tokenValidationParameters.Clone();
+        parameters.ValidAudience = $"{_options.Audience}:password-reset";
+        parameters.ClockSkew = TimeSpan.Zero;
+        try
+        {
+            var principal = new JwtSecurityTokenHandler().ValidateToken(token, parameters, out var validatedToken);
+            if (validatedToken is not JwtSecurityToken jwtToken ||
+                jwtToken.Header.Alg != SecurityAlgorithms.HmacSha256 ||
+                principal.FindFirst("TokenType")?.Value != "PasswordReset")
+            {
+                return null;
+            }
+            return principal;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public ClaimsPrincipal? ValidateToken(string refreshToken)
     {
         var tokenHandler = new JwtSecurityTokenHandler();

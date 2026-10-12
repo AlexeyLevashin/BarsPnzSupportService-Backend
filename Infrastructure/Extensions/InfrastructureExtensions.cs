@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Application.Authentication;
+using System.Security.Claims;
 using Application.Interfaces.Authentication;
 using Application.Interfaces.Hubs;
 using Application.Interfaces.Repositories;
@@ -29,6 +30,7 @@ public static class InfrastructureExtensions
         
         services.AddScoped<IInstitutionRepository, InstitutionRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IPasswordResetRepository, PasswordResetRepository>();
         services.AddScoped<IRequestRepository, RequestRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -39,7 +41,7 @@ public static class InfrastructureExtensions
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IJobTitleRepository, JobTitleRepository>();
         services.AddScoped<IEmailService, EmailService>();
-        services.AddScoped<IPasswordResetCodeRepository, PasswordResetCodeRepository>();
+        services.AddScoped<IInboundEmailRepository, InboundEmailRepository>();
         services.AddMappings();
         services.Configure<SmtpOptions>(configuration.GetSection("SmtpSettings"));
         
@@ -88,6 +90,21 @@ public static class InfrastructureExtensions
                             context.Token = accessToken;
                         }
                         return Task.CompletedTask;
+                    },
+                    OnTokenValidated = async context =>
+                    {
+                        if (!Guid.TryParse(context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId))
+                        {
+                            context.Fail("Некорректный идентификатор пользователя");
+                            return;
+                        }
+
+                        var userRepository = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
+                        var user = await userRepository.GetByIdAsync(userId);
+                        if (user is null || user.IsDeleted || !user.IsActivated)
+                        {
+                            context.Fail("Доступ к учетной записи отозван");
+                        }
                     }
                 };
             });

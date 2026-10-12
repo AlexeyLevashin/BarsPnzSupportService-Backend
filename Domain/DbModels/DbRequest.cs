@@ -10,6 +10,7 @@ public class DbRequest
     public DateTime? ClosedAt { get; set; }
     public Guid ClientId { get; set; }
     public RequestStatus Status { get; set; }
+    public RequestType Type { get; set; } = RequestType.System;
     public Priority Priority { get; set; }
     public Guid? InstitutionId { get; set; }
     public DbUser Client { get; set; }

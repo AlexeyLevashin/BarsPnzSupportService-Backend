@@ -43,7 +43,7 @@ public class RequestController : BaseController
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid? id)
     {
-        return Ok(await _requestService.GetRequestByIdAsync(id));
+        return Ok(await _requestService.GetRequestByIdAsync(id, UserId, UserRole));
     }
     
     [HttpPost("{requestId}/operators")]
@@ -71,14 +71,14 @@ public class RequestController : BaseController
     [HttpGet("{requestId}/messages")]
     public async Task<IActionResult> GetMessages(Guid requestId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        return Ok(await _messageService.GetAllMessagesAsync(page, pageSize, requestId));
+        return Ok(await _messageService.GetAllMessagesAsync(page, pageSize, requestId, UserId, UserRole));
     }
     
     [HttpGet("{requestId}/comments")]
     [Authorize(Roles = "Operator, SuperAdmin")]
     public async Task<IActionResult> GetComments(Guid requestId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        return Ok(await _messageService.GetAllCommentsAsync(page, pageSize, requestId));
+        return Ok(await _messageService.GetAllCommentsAsync(page, pageSize, requestId, UserRole));
     }
 
     [HttpPatch("{requestId}/status")]
@@ -91,7 +91,7 @@ public class RequestController : BaseController
     [HttpPost("{requestId}/view")]
     public async Task<IActionResult> MarkAsViewed(Guid requestId)
     {
-        await _requestService.MarkAsViewedAsync(requestId, UserId);
+        await _requestService.MarkAsViewedAsync(requestId, UserId, UserRole);
         return Ok();
     }
 }

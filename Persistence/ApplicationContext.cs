@@ -18,15 +18,26 @@ public class ApplicationContext : DbContext
     public DbSet<DbJobTitle> JobTitles { get; set; }
     public DbSet<DbEmployeeInstitution> EmployeeInstitutions { get; set; }
     public DbSet<DbRequestView> RequestViews { get; set; }
-    public DbSet<DbPasswordResetCode> PasswordResetCodes { get; set; } 
+    public DbSet<DbPasswordResetRequest> PasswordResetRequests { get; set; }
+    public DbSet<DbInboundEmail> InboundEmails { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<DbPasswordResetRequest>(entity =>
+        {
+            entity.HasIndex(r => r.UserId);
+            entity.Property(r => r.CodeHash).HasMaxLength(64).IsRequired();
+            entity.HasOne<DbUser>().WithMany().HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
         
         modelBuilder.Entity<DbUser>(entity =>
         {
             entity.HasIndex(u => u.Email).IsUnique();
             entity.Property(u => u.Role).HasConversion<string>();
+            entity.Property(u => u.PasswordResetAttemptsRemaining).HasDefaultValue(3);
             
             entity.HasOne(u => u.Employee)
                 .WithOne(e => e.User)
@@ -37,6 +48,17 @@ public class ApplicationContext : DbContext
         modelBuilder.Entity<DbEmployee>(entity =>
         {
             entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+            entity.Property(e => e.Name).IsRequired(false);
+            entity.Property(e => e.Surname).IsRequired(false);
+        });
+
+        modelBuilder.Entity<DbInboundEmail>(entity =>
+        {
+            entity.HasIndex(e => new { e.UidValidity, e.Uid }).IsUnique();
+            entity.Property(e => e.MessageId).HasMaxLength(512);
+            entity.HasIndex(e => e.MessageId);
+            entity.HasOne(e => e.Request).WithMany().HasForeignKey(e => e.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
         
         modelBuilder.Entity<DbEmployee>().HasQueryFilter(e => !e.IsDeleted);
@@ -96,6 +118,7 @@ public class ApplicationContext : DbContext
         modelBuilder.Entity<DbRequest>(entity =>
         {
             entity.Property(r => r.Status).HasConversion<string>();
+            entity.Property(r => r.Type).HasConversion<string>().HasDefaultValue(Domain.Enums.RequestType.System);
             entity.Property(r => r.Priority).HasConversion<string>();
             
             entity.HasIndex(r => r.Status);
@@ -128,23 +151,6 @@ public class ApplicationContext : DbContext
             entity.HasOne(rv => rv.User)
                 .WithMany()
                 .HasForeignKey(rv => rv.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<DbPasswordResetCode>(entity =>
-        {
-            entity.HasKey(c => c.Id);
-
-            entity.Property(c => c.CodeHash)
-                .IsRequired()
-                .HasMaxLength(256);
-
-            entity.HasIndex(c => c.UserId);
-            entity.HasIndex(c => c.ResetToken);
-
-            entity.HasOne(c => c.User)
-                .WithMany()
-                .HasForeignKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
