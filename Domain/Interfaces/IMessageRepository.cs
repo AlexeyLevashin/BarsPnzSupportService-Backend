@@ -8,4 +8,5 @@ public interface IMessageRepository
     public Task CreateAsync(DbMessage message);
     public Task<(List<DbMessage> Messages, int totalCount)> GetAllAsync(int pageNumber, int pageSize, Guid? requestId, MessageType type);
     public Task<DbMessage?> GetByIdAsync(Guid messageId);
+    public Task MoveToRequestAsync(Guid fromRequestId, Guid toRequestId);
 }

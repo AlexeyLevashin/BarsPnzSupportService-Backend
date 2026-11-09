@@ -42,6 +42,8 @@ public static class InfrastructureExtensions
         services.AddScoped<IJobTitleRepository, JobTitleRepository>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IInboundEmailRepository, InboundEmailRepository>();
+        services.AddScoped<ITwoFactorAuthRepository, TwoFactorAuthRepository>();
+        services.AddScoped<ITwoFactorCodeProvider, TwoFactorCodeProvider>();
         services.AddMappings();
         services.Configure<SmtpOptions>(configuration.GetSection("SmtpSettings"));
         

@@ -50,7 +50,12 @@ public class MessageService : IMessageService
         {
             throw new UnacceptableRequestException();
         }
-        
+
+        if (requestCheck.Status == RequestStatus.Merged)
+        {
+            throw new ConflictException("Нельзя отправлять сообщения в объединённую заявку");
+        }
+
         var dbMessage = request.Adapt<DbMessage>();
         dbMessage.RequestId = requestId;
         dbMessage.SenderId = senderId;
@@ -113,7 +118,7 @@ public class MessageService : IMessageService
             BackgroundJob.Enqueue<IEmailService>(x => x.SendEmailAsync(email));
         }
 
-        await _notificationService.NotifyNewMessageAsync(requestId, response);
+        await _notificationService.NotifyNewMessageAsync(requestId, requestCheck.ClientId, response);
 
         if (requestCheck.Type != RequestType.Email && senderId != requestCheck.ClientId && oldStatus != requestCheck.Status)
         {

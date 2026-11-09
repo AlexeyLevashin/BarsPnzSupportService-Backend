@@ -27,14 +27,16 @@ public class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordService _passwordService;
     private readonly IJwtProvider _jwtProvider;
+    private readonly ITwoFactorService _twoFactorService;
 
-    public AuthService(IUserRepository userRepository, IInstitutionRepository institutionRepository, IUnitOfWork unitOfWork, IPasswordService passwordService, IJwtProvider jwtProvider)
+    public AuthService(IUserRepository userRepository, IInstitutionRepository institutionRepository, IUnitOfWork unitOfWork, IPasswordService passwordService, IJwtProvider jwtProvider, ITwoFactorService twoFactorService)
     {
         _userRepository = userRepository;
         _institutionRepository = institutionRepository;
         _unitOfWork = unitOfWork;
         _passwordService = passwordService;
         _jwtProvider = jwtProvider;
+        _twoFactorService = twoFactorService;
     }
 
     public async Task<LoginSuccessResponse> LoginAsync(LoginRequest request)
@@ -44,6 +46,16 @@ public class AuthService : IAuthService
         if (user is null || !user.IsActivated || !_passwordService.Verify(request.Password, user.PasswordHash))
         {
             throw new FailureAuthorizationException();
+        }
+
+        if (await _twoFactorService.IsEnabledAsync(user.Id))
+        {
+            // Пароль верен, но второму фактору нужен код: полный доступ не выдаётся
+            return new LoginSuccessResponse
+            {
+                RequiresTwoFactor = true,
+                TwoFactorToken = _jwtProvider.GenerateTwoFactorToken(user)
+            };
         }
 
         var accessToken = _jwtProvider.GenerateAccessToken(user);

@@ -66,6 +66,7 @@ public class InboundEmailService : IInboundEmailService
         }
 
         Guid? requestId = null;
+        Guid? requestClientId = null;
         Guid? messageId = null;
         var newRequest = false;
 
@@ -116,6 +117,13 @@ public class InboundEmailService : IInboundEmailService
         if (referencedId.HasValue)
         {
             var request = await _requests.GetByIdAsync(referencedId.Value);
+
+            // Ответ на объединённую (схлопнутую) заявку адресуем её живому родителю
+            if (request?.MergedIntoRequestId is { } parentRequestId)
+            {
+                request = await _requests.GetByIdAsync(parentRequestId);
+            }
+
             if (request is null || request.ClientId != user.Id &&
                 !(user.Role == UserRole.SuperAdmin ||
                   user.Role == UserRole.Operator && await _requests.CheckAlreadyAssigned(request.Id, user.Id)))
@@ -139,6 +147,7 @@ public class InboundEmailService : IInboundEmailService
             await AddAttachmentsAsync(reply, email, cancellationToken);
             await _messages.CreateAsync(reply);
             requestId = request.Id;
+            requestClientId = request.ClientId;
             messageId = reply.Id;
         }
         else
@@ -165,6 +174,7 @@ public class InboundEmailService : IInboundEmailService
             request.Messages.Add(firstMessage);
             await _requests.CreateAsync(request);
             requestId = request.Id;
+            requestClientId = request.ClientId;
             newRequest = true;
         }
 
@@ -205,7 +215,8 @@ public class InboundEmailService : IInboundEmailService
                 var request = await _requests.GetByIdAsync(requestId.Value);
                 if (request is not null)
                 {
-                    await _notifications.NotifyNewRequestAsync(request.Adapt<GetRequestResponse>());
+                    var response = request.Adapt<GetRequestResponse>();
+                    await _notifications.NotifyNewRequestAsync(response);
                 }
             }
             else if (messageId.HasValue)
@@ -213,7 +224,8 @@ public class InboundEmailService : IInboundEmailService
                 var message = await _messages.GetByIdAsync(messageId.Value);
                 if (message is not null)
                 {
-                    await _notifications.NotifyNewMessageAsync(requestId.Value, message.Adapt<GetMessageResponse>());
+                    await _notifications.NotifyNewMessageAsync(
+                        requestId.Value, requestClientId.Value, message.Adapt<GetMessageResponse>());
                 }
             }
         }

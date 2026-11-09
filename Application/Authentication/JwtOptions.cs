@@ -8,4 +8,5 @@ public class JwtOptions
 
     public int AccessTokenExpiresMinutes { get; set; } = 15;
     public int RefreshTokenExpiresDays { get; set; } = 30;
+    public int TwoFactorTokenExpiresMinutes { get; set; } = 10;
 }

@@ -13,6 +13,8 @@ public class DbRequest
     public RequestType Type { get; set; } = RequestType.System;
     public Priority Priority { get; set; }
     public Guid? InstitutionId { get; set; }
+    public Guid? MergedIntoRequestId { get; set; }
+    public DbRequest? MergedInto { get; set; }
     public DbUser Client { get; set; }
     public List<DbUser> Operators { get; set; } = new();
     public List<DbMessage> Messages { get; set; } = new();

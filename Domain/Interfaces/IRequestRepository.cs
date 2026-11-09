@@ -5,6 +5,7 @@ namespace Domain.Interfaces;
 public interface IRequestRepository
 {
     public Task CreateAsync(DbRequest request);
+    public void UpdateAsync(DbRequest request);
     public Task<DbRequest?> GetByIdAsync(Guid? id);
     public Task<DbRequest?> GetByIdForAssignmentAsync(Guid? id);
     public Task<(List<DbRequest> Requests, int totalCount)> GetAllAsync(int pageNumber, int pageSize, Guid? userId = null);
@@ -13,5 +14,5 @@ public interface IRequestRepository
     public Task<DbRequestView?> GetViewAsync(Guid requestId, Guid userId);
     public Task AddViewAsync(DbRequestView view);
     public Task UpsertViewAsync(Guid requestId, Guid userId, DateTime viewedAt);
-    public Task<Dictionary<Guid, bool>> GetUnreadFlagsAsync(List<Guid> requestIds, Guid userId);
+    public Task<Dictionary<Guid, bool>> GetUnreadFlagsAsync(List<Guid> requestIds, Guid userId, bool includeInternalMessages);
 }

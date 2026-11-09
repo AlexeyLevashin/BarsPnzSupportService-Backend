@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using Application.Authentication;
 using Application.Common.Minio;
 using Application.Common.Validators;
 using Application.Common.Validators.Interfaces;
@@ -21,6 +22,7 @@ public static class ApplicationExtensions
         services.AddScoped<IInstitutionService, InstitutionService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
+        services.AddScoped<ITwoFactorService, TwoFactorAuthService>();
         services.AddScoped<IRequestService, RequestService>();
         services.AddScoped<IMessageService, MessageService>();
         services.AddScoped<IAttachmentService, AttachmentService>();
@@ -30,6 +32,7 @@ public static class ApplicationExtensions
         services.AddScoped<IWorkplaceValidationService, WorkplaceValidationService>();
         services.AddScoped<IEmailTemplateBuilder, EmailTemplateBuilder>();
         services.AddScoped<IInboundEmailService, InboundEmailService>();
+        services.Configure<TwoFactorOptions>(configuration.GetSection("TwoFactor"));
         services.Configure<FileUploadOptions>(configuration.GetSection("FileUpload"));
         var config = TypeAdapterConfig.GlobalSettings;
         config.Scan(Assembly.GetExecutingAssembly()); 

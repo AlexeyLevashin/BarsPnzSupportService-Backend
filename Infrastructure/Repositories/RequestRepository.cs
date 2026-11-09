@@ -23,6 +23,11 @@ public class RequestRepository : IRequestRepository
         await _context.Requests.AddAsync(request);
     }
 
+    public void UpdateAsync(DbRequest request)
+    {
+        _context.Requests.Update(request);
+    }
+
     public async Task<DbRequest?> GetByIdAsync(Guid? id)
     {
         return await _context.Requests
@@ -54,6 +59,7 @@ public class RequestRepository : IRequestRepository
         IQueryable<DbRequest> query = _context.Requests
             .IgnoreQueryFilters()
             .AsNoTracking()
+            .Where(r => r.Status != RequestStatus.Merged)
             .Include(r => r.Client)
                 .ThenInclude(u => u.Employee)
                     .ThenInclude(e => e.EmployeeInstitutions)
@@ -119,7 +125,8 @@ public class RequestRepository : IRequestRepository
             DO UPDATE SET ""LastViewedAt"" = EXCLUDED.""LastViewedAt""");
     }
 
-    public async Task<Dictionary<Guid, bool>> GetUnreadFlagsAsync(List<Guid> requestIds, Guid userId)
+    public async Task<Dictionary<Guid, bool>> GetUnreadFlagsAsync(
+        List<Guid> requestIds, Guid userId, bool includeInternalMessages)
     {
         if (!requestIds.Any())
         {
@@ -134,6 +141,7 @@ public class RequestRepository : IRequestRepository
         var lastForeignActivity = await _context.Messages
             .AsNoTracking()
             .Where(m => requestIds.Contains(m.RequestId) && m.SenderId != userId)
+            .Where(m => includeInternalMessages || m.Type == MessageType.Public)
             .GroupBy(m => m.RequestId)
             .Select(g => new { RequestId = g.Key, LastAt = g.Max(m => m.CreatedAt) })
             .ToDictionaryAsync(x => x.RequestId, x => x.LastAt);

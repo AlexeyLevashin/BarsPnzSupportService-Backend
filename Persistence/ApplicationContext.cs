@@ -20,6 +20,8 @@ public class ApplicationContext : DbContext
     public DbSet<DbRequestView> RequestViews { get; set; }
     public DbSet<DbPasswordResetRequest> PasswordResetRequests { get; set; }
     public DbSet<DbInboundEmail> InboundEmails { get; set; }
+    public DbSet<DbTwoFactorAuth> TwoFactorAuths { get; set; }
+    public DbSet<DbTwoFactorRecoveryCode> TwoFactorRecoveryCodes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +32,26 @@ public class ApplicationContext : DbContext
             entity.HasIndex(r => r.UserId);
             entity.Property(r => r.CodeHash).HasMaxLength(64).IsRequired();
             entity.HasOne<DbUser>().WithMany().HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DbTwoFactorAuth>(entity =>
+        {
+            entity.HasIndex(e => e.UserId).IsUnique();
+            entity.Property(e => e.Secret).HasMaxLength(64).IsRequired();
+
+            entity.HasOne<DbUser>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DbTwoFactorRecoveryCode>(entity =>
+        {
+            entity.HasIndex(e => e.TwoFactorAuthId);
+            entity.Property(e => e.CodeHash).HasMaxLength(64).IsRequired();
+
+            entity.HasOne(e => e.TwoFactorAuth)
+                .WithMany(e => e.RecoveryCodes)
+                .HasForeignKey(e => e.TwoFactorAuthId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
         
@@ -128,6 +150,11 @@ public class ApplicationContext : DbContext
                 .WithMany()
                 .HasForeignKey(r => r.ClientId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(r => r.MergedInto)
+                .WithMany()
+                .HasForeignKey(r => r.MergedIntoRequestId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasMany(r => r.Operators)
                 .WithMany(u => u.Requests)
