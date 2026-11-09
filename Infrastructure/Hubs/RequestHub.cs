@@ -19,7 +19,10 @@ public class RequestHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        var userRole = Context.User!.GetUserRole();
+        var user = Context.User!;
+        var userRole = user.GetUserRole();
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"User_{user.GetUserId()}");
 
         if (userRole == UserRole.Operator || userRole == UserRole.SuperAdmin)
         {

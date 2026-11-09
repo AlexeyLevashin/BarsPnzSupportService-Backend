@@ -4,6 +4,7 @@ using Application.Dto.Messages.Requests;
 using Application.Dto.Requests.Requests;
 using Application.Interfaces;
 using Application.Services;
+using Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -27,6 +28,20 @@ public class RequestController : BaseController
         return Ok(await _requestService.AddAsync(request, UserId, UserRole, InstitutionIds));
     }
 
+    [HttpPost("phone")]
+    [Authorize(Roles = "Operator, SuperAdmin")]
+    public async Task<IActionResult> CreatePhoneRequest(CreatePhoneRequestRequest request)
+    {
+        return Ok(await _requestService.AddPhoneRequestAsync(request, UserId));
+    }
+
+    [HttpPut("{requestId}")]
+    [Authorize(Roles = "Operator, SuperAdmin")]
+    public async Task<IActionResult> Update(UpdateRequestRequest request, Guid requestId)
+    {
+        return Ok(await _requestService.UpdateAsync(request, requestId));
+    }
+
     [HttpGet("all")]
     [Authorize(Roles = "SuperAdmin, Operator")]
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
@@ -46,6 +61,13 @@ public class RequestController : BaseController
         return Ok(await _requestService.GetRequestByIdAsync(id, UserId, UserRole));
     }
     
+    [HttpPost("{parentRequestId}/merge")]
+    [Authorize(Roles = "Operator, SuperAdmin")]
+    public async Task<IActionResult> Merge(Guid parentRequestId, MergeRequestsRequest request)
+    {
+        return Ok(await _requestService.MergeAsync(parentRequestId, request));
+    }
+
     [HttpPost("{requestId}/operators")]
     [Authorize(Roles = "SuperAdmin, Operator")]
     public async Task<IActionResult> AssignToOperator(Guid requestId, OperatorRequest request)

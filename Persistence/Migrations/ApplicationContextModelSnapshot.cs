@@ -251,6 +251,9 @@ namespace Persistence.Migrations
                     b.Property<Guid?>("InstitutionId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("MergedIntoRequestId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Priority")
                         .IsRequired()
                         .HasColumnType("text");
@@ -275,6 +278,8 @@ namespace Persistence.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("InstitutionId");
+
+                    b.HasIndex("MergedIntoRequestId");
 
                     b.HasIndex("Status");
 
@@ -444,11 +449,18 @@ namespace Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Domain.DbModels.DbRequest", "MergedInto")
+                        .WithMany()
+                        .HasForeignKey("MergedIntoRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Domain.DbModels.DbInstitution", "Institution")
                         .WithMany()
                         .HasForeignKey("InstitutionId");
 
                     b.Navigation("Client");
+
+                    b.Navigation("MergedInto");
 
                     b.Navigation("Institution");
                 });
@@ -531,7 +543,59 @@ namespace Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
+
+            modelBuilder.Entity("Domain.DbModels.DbTwoFactorAuth", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<DateTime?>("ConfirmedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("FailedAttempts").HasColumnType("integer");
+                    b.Property<bool>("IsEnabled").HasColumnType("boolean");
+                    b.Property<long>("LastUsedStep").HasColumnType("bigint");
+                    b.Property<DateTime?>("LockedUntil").HasColumnType("timestamp with time zone");
+                    b.Property<string>("Secret").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<Guid>("UserId").HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasIndex("UserId").IsUnique();
+                    b.ToTable("TwoFactorAuths");
+                });
+
+            modelBuilder.Entity("Domain.DbModels.DbTwoFactorRecoveryCode", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<Guid>("TwoFactorAuthId").HasColumnType("uuid");
+                    b.Property<string>("CodeHash").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<bool>("IsUsed").HasColumnType("boolean");
+                    b.HasKey("Id");
+                    b.HasIndex("TwoFactorAuthId");
+                    b.ToTable("TwoFactorRecoveryCodes");
+                });
+
+            modelBuilder.Entity("Domain.DbModels.DbTwoFactorAuth", b =>
+                {
+                    b.HasOne("Domain.DbModels.DbUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.DbModels.DbTwoFactorRecoveryCode", b =>
+                {
+                    b.HasOne("Domain.DbModels.DbTwoFactorAuth", "TwoFactorAuth")
+                        .WithMany("RecoveryCodes")
+                        .HasForeignKey("TwoFactorAuthId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwoFactorAuth");
+                });
 #pragma warning restore 612, 618
+
+            modelBuilder.Entity("Domain.DbModels.DbTwoFactorAuth", b =>
+                {
+                    b.Navigation("RecoveryCodes");
+                });
+
         }
     }
 }

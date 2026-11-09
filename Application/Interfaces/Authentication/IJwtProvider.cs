@@ -11,5 +11,7 @@ public interface IJwtProvider
     public ClaimsPrincipal? ValidatePasswordResetToken(string token);
 
     public ClaimsPrincipal? ValidateToken(string refreshToken);
+    public string GenerateTwoFactorToken(DbUser user);
+    public ClaimsPrincipal? ValidateTwoFactorToken(string token);
 
 }

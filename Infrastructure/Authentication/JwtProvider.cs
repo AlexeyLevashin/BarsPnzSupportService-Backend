@@ -107,47 +107,52 @@ public class JwtProvider : IJwtProvider
 
     public ClaimsPrincipal? ValidatePasswordResetToken(string token)
     {
-        var parameters = _tokenValidationParameters.Clone();
-        parameters.ValidAudience = $"{_options.Audience}:password-reset";
-        parameters.ClockSkew = TimeSpan.Zero;
-        try
-        {
-            var principal = new JwtSecurityTokenHandler().ValidateToken(token, parameters, out var validatedToken);
-            if (validatedToken is not JwtSecurityToken jwtToken ||
-                jwtToken.Header.Alg != SecurityAlgorithms.HmacSha256 ||
-                principal.FindFirst("TokenType")?.Value != "PasswordReset")
-            {
-                return null;
-            }
-            return principal;
-        }
-        catch
-        {
-            return null;
-        }
+        return ValidateSpecialToken(token, $"{_options.Audience}:password-reset", "PasswordReset", TimeSpan.Zero);
     }
 
     public ClaimsPrincipal? ValidateToken(string refreshToken)
     {
-        var tokenHandler = new JwtSecurityTokenHandler();
+        return ValidateSpecialToken(refreshToken, _options.Audience, "Refresh", _tokenValidationParameters.ClockSkew);
+    }
 
+    public string GenerateTwoFactorToken(DbUser user)
+    {
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var token = tokenHandler.CreateToken(new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim("TokenType", "TwoFactor")
+            }),
+            Expires = DateTime.UtcNow.AddMinutes(_options.TwoFactorTokenExpiresMinutes),
+            Issuer = _options.Issuer,
+            Audience = $"{_options.Audience}:two-factor",
+            SigningCredentials =
+                new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey)),
+                    SecurityAlgorithms.HmacSha256)
+        });
+        return tokenHandler.WriteToken(token);
+    }
+
+    public ClaimsPrincipal? ValidateTwoFactorToken(string token)
+    {
+        return ValidateSpecialToken(token, $"{_options.Audience}:two-factor", "TwoFactor", TimeSpan.Zero);
+    }
+
+    private ClaimsPrincipal? ValidateSpecialToken(string token, string audience, string tokenType, TimeSpan clockSkew)
+    {
+        var parameters = _tokenValidationParameters.Clone();
+        parameters.ValidAudience = audience;
+        parameters.ClockSkew = clockSkew;
         try
         {
-            var principal = tokenHandler.ValidateToken(refreshToken, _tokenValidationParameters, out SecurityToken validatedToken);
-
-            if (validatedToken is not JwtSecurityToken jwtSecurityToken ||
-                !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-            {
-                return null;
-            }
-
-            var tokenType = principal.FindFirst("TokenType")?.Value;
-            if (tokenType != "Refresh")
-            {
-                return null; 
-            }
-
-            return principal;
+            var principal = new JwtSecurityTokenHandler().ValidateToken(token, parameters, out var validatedToken);
+            return validatedToken is JwtSecurityToken jwtToken &&
+                   jwtToken.Header.Alg == SecurityAlgorithms.HmacSha256 &&
+                   principal.FindFirst("TokenType")?.Value == tokenType
+                ? principal
+                : null;
         }
         catch
         {

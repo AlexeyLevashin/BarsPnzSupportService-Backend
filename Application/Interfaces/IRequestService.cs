@@ -10,9 +10,12 @@ namespace Application.Interfaces;
 public interface IRequestService
 {
     public Task<CreateRequestResponse> AddAsync(CreateRequestRequest request, Guid userId, UserRole userRole, List<Guid> institutionIds);
+    public Task<CreateRequestResponse> AddPhoneRequestAsync(CreatePhoneRequestRequest request, Guid createdByUserId);
+    public Task<GetRequestResponse> UpdateAsync(UpdateRequestRequest request, Guid requestId);
     public Task<PagedResponse<GetRequestResponse>> GetAllAsync(int pageNumber, int pageSize, Guid userId);
     public Task<PagedResponse<GetRequestResponse>> GetMyAsync(int pageNumber, int pageSize, Guid? userId);
     public Task<GetRequestResponse> GetRequestByIdAsync(Guid? id, Guid userId, UserRole userRole);
+    public Task<GetRequestResponse> MergeAsync(Guid parentRequestId, MergeRequestsRequest request);
     public Task AssignToOperatorAsync(Guid requestId, Guid operatorId);
     public Task DeleteOperatorAsync(Guid requestId, Guid operatorId);
     public Task ChangeStatusAsync(Guid requestId, UpdateStatusRequest request, Guid userId, UserRole userRole);

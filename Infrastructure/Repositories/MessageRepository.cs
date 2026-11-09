@@ -55,5 +55,17 @@ public class MessageRepository : IMessageRepository
             .Include(u => u.Sender)
             .Include(m => m.Attachments)
             .FirstOrDefaultAsync(m => m.Id == messageId);
+    }
+
+    public async Task MoveToRequestAsync(Guid fromRequestId, Guid toRequestId)
+    {
+        var messages = await _context.Messages
+            .Where(m => m.RequestId == fromRequestId)
+            .ToListAsync();
+
+        foreach (var message in messages)
+        {
+            message.RequestId = toRequestId;
+        }
     } 
 }

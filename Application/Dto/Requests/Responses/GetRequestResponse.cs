@@ -10,6 +10,7 @@ public class GetRequestResponse
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ClosedAt { get; set; }
     public Guid ClientId { get; set; }
+    public Guid? MergedIntoRequestId { get; set; }
     public string ClientFullName { get; set; }
     public Guid? InstitutionId { get; set; }
     public string? InstitutionName { get; set; }
