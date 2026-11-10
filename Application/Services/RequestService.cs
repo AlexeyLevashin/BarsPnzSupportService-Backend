@@ -84,7 +84,13 @@ public class RequestService : IRequestService
         
         if (request.Message.AttachmentIds != null && request.Message.AttachmentIds.Any())
         {
-            await _attachmentRepository.AttachFilesToMessageAsync(request.Message.AttachmentIds, dbMessage.Id);
+            var attachedCount = await _attachmentRepository.AttachFilesToMessageAsync(request.Message.AttachmentIds, dbMessage.Id);
+
+            // Часть файлов уже была кем-то прикреплена к другим сообщениям
+            if (attachedCount != request.Message.AttachmentIds.Count)
+            {
+                throw new ConflictException("Некоторые файлы уже используются в другом сообщении");
+            }
         }
 
         await _requestRepository.UpsertViewAsync(dbRequest.Id, userId, dbRequest.CreatedAt);
@@ -149,10 +155,13 @@ public class RequestService : IRequestService
             ClientId = client.Id,
             Client = client,
             InstitutionId = institutionId,
-            Status = RequestStatus.New,
+            // Оператор, создавший заявку по звонку, сразу закреплён за ней и ведёт обработку
+            Status = RequestStatus.InProgress,
             Type = RequestType.Phone,
             Priority = request.Priority
         };
+        phoneRequest.Operators.Add(creator);
+
         var firstMessage = request.Message.Adapt<DbMessage>();
         firstMessage.RequestId = phoneRequest.Id;
         firstMessage.SenderId = creator.Id;
@@ -164,7 +173,12 @@ public class RequestService : IRequestService
 
         if (request.Message.AttachmentIds is { Count: > 0 })
         {
-            await _attachmentRepository.AttachFilesToMessageAsync(request.Message.AttachmentIds, firstMessage.Id);
+            var attachedCount = await _attachmentRepository.AttachFilesToMessageAsync(request.Message.AttachmentIds, firstMessage.Id);
+
+            if (attachedCount != request.Message.AttachmentIds.Count)
+            {
+                throw new ConflictException("Некоторые файлы уже используются в другом сообщении");
+            }
         }
 
         await _requestRepository.UpsertViewAsync(phoneRequest.Id, createdByUserId, phoneRequest.CreatedAt);
@@ -487,7 +501,7 @@ public class RequestService : IRequestService
             throw new UnacceptableRequestException();
         }
         
-        if (userRole == UserRole.Operator || userRole == UserRole.SuperAdmin)
+        if ((userRole == UserRole.Operator || userRole == UserRole.SuperAdmin) && requestCheck.ClientId != userId)
         {
             bool checkUserAssignToRequest = await _requestRepository.CheckAlreadyAssigned(requestId, userId);
             

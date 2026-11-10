@@ -11,5 +11,5 @@ public interface IMessageService
     public Task<GetMessageResponse> AddAsync(Guid requestId, CreateMessageRequest request, Guid senderId, UserRole userRole);
     public Task<PagedResponse<GetMessageResponse>> GetAllMessagesAsync(int pageNumber, int pageSize, Guid? requestId, Guid userId, UserRole userRole);
     public Task<PagedResponse<GetMessageResponse>> GetAllCommentsAsync(int pageNumber, int pageSize, Guid? requestId, UserRole userRole);
-    //public Task ChangeStatusAsync(Guid id);
+    public Task<GetMessageResponse> UpdateAsync(Guid messageId, Guid userId, UserRole userRole, UpdateMessageRequest request);
 }

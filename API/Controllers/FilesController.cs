@@ -5,6 +5,7 @@ using Application.Exceptions.Attachments;
 using Application.Exceptions.Files;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -80,19 +81,10 @@ public class FilesController : BaseController
     }
     
     [HttpDelete("{fileId}")]
+    [Authorize]
     public async Task<IActionResult> Delete(Guid fileId)
     {
-        var fileRecord = await _attachmentService.GetByIdAsync(fileId);
-        if (fileRecord is null)
-        {
-            throw new AttachmentNotFoundException();
-        }
-        
-        string stringKeyForMinio = fileRecord.StorageKey;
-        await _storage.DeleteAsync(stringKeyForMinio, "attachments");
-
-        await _attachmentService.DeleteAsync(fileId);
-        
+        await _attachmentService.DeleteAsync(fileId, UserId);
         return NoContent();
     }
 }
