@@ -24,10 +24,11 @@ public class AttachmentRepository : IAttachmentRepository
       return await _context.Attachments.FirstOrDefaultAsync(i => i.Id == fileId);
    }
    
-   public async Task AttachFilesToMessageAsync(List<Guid> fileIds, Guid messageId)
+   public Task<int> AttachFilesToMessageAsync(List<Guid> fileIds, Guid messageId)
    {
-      await _context.Attachments
-         .Where(a => fileIds.Contains(a.Id))
+      // Привязываем только непривязанные файлы (MessageId == null)
+      return _context.Attachments
+         .Where(a => fileIds.Contains(a.Id) && a.MessageId == null)
          .ExecuteUpdateAsync(s => s.SetProperty(x => x.MessageId, messageId));
    }
 

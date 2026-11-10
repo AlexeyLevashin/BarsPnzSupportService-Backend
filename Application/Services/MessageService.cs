@@ -3,6 +3,7 @@ using Application.Dto.Messages.Requests;
 using Application.Dto.EmailMessages.Requests;
 using Application.Dto.Messages.Responses;
 using Application.Exceptions.Abstractions;
+using Application.Exceptions.Attachments;
 using Application.Exceptions.Messages;
 using Application.Exceptions.Requests;
 using Application.Exceptions.Users;
@@ -67,14 +68,16 @@ public class MessageService : IMessageService
         
         if (userRole == UserRole.Operator || userRole == UserRole.SuperAdmin)
         {
-            bool checkUserAssignToRequest = await _requestRepository.CheckAlreadyAssigned(requestId, senderId);
+            // Оператор, являющийся клиентом заявки, действует как клиент - назначение не требуется
+            bool senderIsRequestClient = senderId == requestCheck.ClientId;
+            bool checkUserAssignToRequest = senderIsRequestClient || await _requestRepository.CheckAlreadyAssigned(requestId, senderId);
             
-            if(!checkUserAssignToRequest && request.Type == MessageType.Public)
+            if (!checkUserAssignToRequest && request.Type == MessageType.Public)
                 throw new NoOperatorAssignedToRequest();
         }
 
         var oldStatus = requestCheck.Status;
-        requestCheck.Status = ChangeStatusAsync(requestCheck.Status, request.Status, userRole, request.Type);
+        requestCheck.Status = ResolveStatusAfterMessage(requestCheck.Status, request.Status, userRole, request.Type, senderId, requestCheck.ClientId);
 
         if ((requestCheck.Status == RequestStatus.Canceled || requestCheck.Status == RequestStatus.Closed) && request.Type == MessageType.Public)
         {
@@ -188,29 +191,72 @@ public class MessageService : IMessageService
             PageInfo = new PageViewModel(pageNumber, messagesInfo.totalCount, pageSize)
         };
     }
-    
-    private RequestStatus ChangeStatusAsync(RequestStatus currentStatus, RequestStatus status, UserRole userRole, MessageType type)
+
+    public async Task<GetMessageResponse> UpdateAsync(Guid messageId, Guid userId, UserRole userRole, UpdateMessageRequest request)
     {
-        if ((userRole == UserRole.User || userRole == UserRole.UserAdmin) && status != RequestStatus.Closed)
+        var message = await _messageRepository.GetByIdAsync(messageId);
+        if (message is null)
+        {
+            throw new MessageNotFoundException();
+        }
+
+        if (userId != message.SenderId)
+        {
+            throw new UnacceptableRequestException("Нельзя редактировать чужое сообщение");
+        }
+
+        if (request.Text is not null)
+        {
+            message.Text = request.Text;
+        }
+
+        if (request.AttachmentIds is { Count: > 0 })
+        {
+            foreach (var attachmentId in request.AttachmentIds)
+            {
+                // Файл должен существовать и быть непривязанным
+                var attachment = await _attachmentRepository.GetByIdAsync(attachmentId)
+                    ?? throw new AttachmentNotFoundException();
+
+                if (attachment.MessageId is not null)
+                {
+                    throw new ConflictException("Файл уже прикреплён к сообщению");
+                }
+
+                attachment.MessageId = messageId;
+                message.Attachments.Add(attachment);
+            }
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+
+        return message.Adapt<GetMessageResponse>();
+    }
+
+    
+    private RequestStatus ResolveStatusAfterMessage(RequestStatus currentStatus, RequestStatus status, UserRole userRole, MessageType type, Guid senderId, Guid requestClientId)
+    {
+        // Клиент заявки (в т.ч. оператор, создавший заявку от себя) может только
+        // закрыть её или вернуть в работу - PendingReview/ClientDataRequest им не доступны
+        var senderIsRequestClient = senderId == requestClientId;
+
+        if (senderIsRequestClient && status != RequestStatus.Closed)
         {
             return currentStatus == RequestStatus.New ? RequestStatus.New : RequestStatus.InProgress;
         }
-        
+
         if ((userRole == UserRole.Operator || userRole == UserRole.SuperAdmin) && type == MessageType.Internal)
         {
             return currentStatus;
         }
 
-        if (status == RequestStatus.New)
+        // New и Merged нельзя выставить сообщением: New возникает только при снятии оператора,
+        // Merged управляется исключительно операцией объединения
+        if (status == RequestStatus.New || status == RequestStatus.Merged)
         {
             return currentStatus;
         }
 
-        if (currentStatus != status)
-        {
-            
-        }
-        
         return status;
     }
 }
